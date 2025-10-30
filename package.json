@@ -1,0 +1,31 @@
+{
+  "name": "library_db_project",
+  "version": "1.0.0",
+  "description": "Building a database to represent our university library system",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/orjass2016/Library_DB_Project.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/orjass2016/Library_DB_Project/issues"
+  },
+  "homepage": "https://github.com/orjass2016/Library_DB_Project#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "mysql2": "^3.15.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
