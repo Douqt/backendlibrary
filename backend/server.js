@@ -66,9 +66,18 @@ app.use(errorHandler);
 // START SERVER
 // ===========================
 const PORT = process.env.PORT || 5000;
+const https = require('https');
+const fs = require('fs');
 
-app.listen(PORT, () => {
-  console.log(`server running on port ${PORT}`);
-  console.log(`http://localhost:${PORT}`);
+// For development, generate self-signed certificate
+// Run: openssl req -nodes -new -x509 -keyout server.key -out server.cert
+const key = fs.readFileSync('./server.key');
+const cert = fs.readFileSync('./server.cert');
+
+const server = https.createServer({ key, cert }, app);
+
+server.listen(PORT, () => {
+  console.log(`server running on port ${PORT} with HTTPS`);
+  console.log(`https://localhost:${PORT}`);
   console.log(`environment: ${process.env.NODE_ENV || 'development'}`);
 });
