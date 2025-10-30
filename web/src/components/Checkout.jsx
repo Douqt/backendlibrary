@@ -31,10 +31,10 @@ const Checkout = ({ user, searchQuery, onClearSearch, initialCategoryFilter }) =
       try {
         setLoading(true);
         const urls = [
-          'http://localhost:5000/api/books?available=true',
-          'http://localhost:5000/api/movies?available=true',
-          'http://localhost:5000/api/articles?available=true',
-          'http://localhost:5000/api/electronics?available=true'
+          'http://130.131.225.98:5000/api/books?available=true',
+          'http://130.131.225.98:5000/api/movies?available=true',
+          'http://130.131.225.98:5000/api/articles?available=true',
+          'http://130.131.225.98:5000/api/electronics?available=true'
         ];
 
         if (searchQuery) {
@@ -187,7 +187,7 @@ const Checkout = ({ user, searchQuery, onClearSearch, initialCategoryFilter }) =
         'x-user-id': userData.user_type === 'member' ? userData.member_id : userData.staff_id
       };
 
-      const response = await fetch('http://localhost:5000/api/loans', {
+      const response = await fetch('http://130.131.225.98:5000/api/loans', {
         method: 'POST',
         headers,
         body: JSON.stringify({
