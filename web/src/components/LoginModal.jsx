@@ -17,14 +17,14 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
     setError('');
 
     try {
-      const response = await fetch('https://130.131.225.98/api/auth/login', {
+      const response = await fetch('https://librarydb.duckdns.org/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ username, password }),
       });
-
+      
       const data = await response.json();
 
       if (data.success) {

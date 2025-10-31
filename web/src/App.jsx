@@ -33,7 +33,7 @@ function App() {
 
   const handleLogout = async () => {
     try {
-      await fetch('https://130.131.225.98/api/auth/logout', {
+      await fetch('https://librarydb.duckdns.org/api/auth/logout', {
         method: 'POST'
       });
     } catch (error) {
@@ -162,7 +162,7 @@ function StaffManagement({ user }) {
         'x-user-id': userData.staff_id
       };
 
-      const response = await fetch('https://130.131.225.98/api/staff', { headers });
+      const response = await fetch('https://librarydb.duckdns.org/api/staff', { headers });
       const data = await response.json();
       setStaff(data.data || []);
       setLoading(false);
@@ -180,7 +180,7 @@ function StaffManagement({ user }) {
         'x-user-type': userData.user_type,
         'x-user-id': userData.staff_id
       };
-      const response = await fetch('https://130.131.225.98/api/branches', { headers });
+      const response = await fetch('https://librarydb.duckdns.org/api/branches', { headers });
       if (response.ok) {
         const data = await response.json();
         setBranches(data.data || []);
@@ -314,8 +314,8 @@ function StaffForm({ staff, branches, onSave, onCancel }) {
       };
 
       const url = staff
-        ? `https://130.131.225.98/api/staff/${staff.staff_id}`
-        : 'https://130.131.225.98/api/staff';
+        ? `https://librarydb.duckdns.org/api/staff/${staff.staff_id}`
+        : 'https://librarydb.duckdns.org/api/staff';
       const method = staff ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
@@ -458,7 +458,7 @@ function Books({ user }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch('https://130.131.225.98/api/books')
+    fetch('https://librarydb.duckdns.org/api/books')
       .then(res => res.json())
       .then(data => {
         setBooks(data.data || []);
@@ -481,7 +481,7 @@ function Books({ user }) {
         'x-user-id': user.user_type === 'member' ? user.member_id : user.staff_id
       };
 
-      const response = await fetch('https://130.131.225.98/api/loans', {
+      const response = await fetch('https://librarydb.duckdns.org/api/loans', {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -496,7 +496,7 @@ function Books({ user }) {
         const result = await response.json();
         alert(`Book "${book.title}" has been checked out successfully!`);
         // Refresh books list
-        fetch('https://130.131.225.98/api/books')
+        fetch('https://librarydb.duckdns.org/api/books')
           .then(res => res.json())
           .then(data => setBooks(data.data || []))
           .catch(err => console.error('Error refreshing books:', err));
@@ -572,7 +572,7 @@ function Members() {
       headers['x-user-id'] = user.user_type === 'member' ? user.member_id : user.staff_id;
     }
 
-    fetch('https://130.131.225.98/api/members', { headers })
+    fetch('https://librarydb.duckdns.org/api/members', { headers })
       .then(res => res.json())
       .then(data => {
         setMembers(data.data || []);
@@ -638,7 +638,7 @@ function Loans({ user }) {
       headers['x-user-id'] = user.user_type === 'member' ? user.member_id : user.staff_id;
     }
 
-    fetch('https://130.131.225.98/api/loans', { headers })
+    fetch('https://librarydb.duckdns.org/api/loans', { headers })
       .then(res => res.json())
       .then(data => {
         setLoans(data.data || []);
@@ -698,7 +698,7 @@ function Loans({ user }) {
                           'x-user-id': userData.user_type === 'member' ? userData.member_id : userData.staff_id
                         };
 
-                        const response = await fetch(`https://130.131.225.98/api/loans/${loan.loan_id}`, {
+                        const response = await fetch(`https://librarydb.duckdns.org/api/loans/${loan.loan_id}`, {
                           method: 'DELETE',
                           headers
                         });
@@ -706,7 +706,7 @@ function Loans({ user }) {
                         if (response.ok) {
                           alert(`"${loan.item_title}" has been returned successfully!`);
                           // Refresh loans list
-                          fetch('https://130.131.225.98/api/loans', { headers })
+                          fetch('https://librarydb.duckdns.org/api/loans', { headers })
                             .then(res => res.json())
                             .then(data => setLoans(data.data || []))
                             .catch(err => console.error('Error refreshing loans:', err));
@@ -745,7 +745,7 @@ function Fines({ user }) {
       headers['x-user-id'] = user.user_type === 'member' ? user.member_id : user.staff_id;
     }
 
-    fetch('https://130.131.225.98/api/fines', { headers })
+    fetch('https://librarydb.duckdns.org/api/fines', { headers })
       .then(res => res.json())
       .then(data => {
         setFines(data || []);
@@ -807,7 +807,7 @@ function Fines({ user }) {
                           'x-user-id': user.user_type === 'member' ? user.member_id : user.staff_id
                         };
 
-                        const response = await fetch(`https://130.131.225.98/api/fines/${fine.fine_id}`, {
+                        const response = await fetch(`https://librarydb.duckdns.org/api/fines/${fine.fine_id}`, {
                           method: 'PATCH',
                           headers,
                           body: JSON.stringify({ payment_status: 'paid' })
@@ -815,7 +815,7 @@ function Fines({ user }) {
 
                         if (response.ok) {
                           // Refresh fines list
-                          const finesResponse = await fetch('https://130.131.225.98/api/fines', { headers });
+                          const finesResponse = await fetch('https://librarydb.duckdns.org/api/fines', { headers });
                           const finesData = await finesResponse.json();
                           setFines(finesData || []);
                         }

@@ -10,7 +10,7 @@ const FeaturedBooks = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch('https://130.131.225.98/api/books')
+    fetch('https://librarydb.duckdns.org/api/books')
       .then(res => res.json())
       .then(data => {
         // Take the first 4 books as featured

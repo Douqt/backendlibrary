@@ -44,7 +44,7 @@ const Categories = ({ onCategoryClick }) => {
       try {
         const promises = categories.map(async (category) => {
           try {
-            const response = await fetch(`https://130.131.225.98/api/${category.api}`);
+            const response = await fetch(`https://librarydb.duckdns.org/api/${category.api}`);
             const data = await response.json();
             return data.data ? data.data.length : 0;
           } catch (err) {
