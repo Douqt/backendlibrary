@@ -17,7 +17,7 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
     setError('');
 
     try {
-      const response = await fetch('http://130.131.225.98:5000/api/auth/login', {
+      const response = await fetch('https://130.131.225.98/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

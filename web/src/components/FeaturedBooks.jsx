@@ -10,7 +10,7 @@ const FeaturedBooks = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch('http://130.131.225.98:5000/api/books')
+    fetch('https://130.131.225.98/api/books')
       .then(res => res.json())
       .then(data => {
         // Take the first 4 books as featured
