@@ -27,7 +27,7 @@ function App() {
 
   const handleLogin = (userData) => {
     setUser(userData);
-    localStorage.setItem('user',JSON.stringify(userData));
+    localStorage.setItem('user', JSON.stringify(userData));
     setLoginModal(false);
   };
 
