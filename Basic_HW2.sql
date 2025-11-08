@@ -672,9 +672,85 @@ BEGIN
 END$$
 
 -- ===============================
--- STORED PROCEDURES
+-- STORED PROCEDURES & VIEWS 
 -- ===============================
 
+CREATE OR REPLACE VIEW vw_user_summary AS
+SELECT 
+    user.member_id,
+    user.member_name,
+    user.email
+    user.item_type,
+    user.status AS member_type,
+    (
+      SELECT COUNT(*)
+      FROM loan l
+      WHERE l.member_id = user.member_id
+        AND l.return_ts IS NULL
+    ) AS active_loans_count,
+
+    --Total loans in history
+    (
+      SELECT COUNT(*)
+      FROM loan l
+      WHERE l.member_id = user.member_id
+    ) AS total_loans_count,
+
+-- How many fines exist
+    (
+      SELECT COUNT(*)
+      FROM fines f
+      WHERE f.member_id = m.member_id
+    ) AS total_fines_count,
+
+    -- Total amount of fines charged
+    (
+      SELECT COALESCE(SUM(f.amount), 0)
+      FROM fines f
+      WHERE f.member_id = m.member_id
+    ) AS total_fines_amount,
+
+    -- Total amount actually paid (from payments table)
+    (
+      SELECT COALESCE(SUM(p.paid_amount), 0)
+      FROM fines f
+      JOIN payments p ON p.fine_id = f.fine_id
+      WHERE f.member_id = m.member_id
+    ) AS total_fines_paid,
+
+    -- Remaining balance = fines charged - payments made
+    (
+      (SELECT COALESCE(SUM(f.amount), 0)
+       FROM fines f
+       WHERE f.member_id = m.member_id)
+      -
+      (SELECT COALESCE(SUM(p.paid_amount), 0)
+       FROM fines f
+       JOIN payments p ON p.fine_id = f.fine_id
+       WHERE f.member_id = m.member_id)
+    ) AS total_fines_balance
+
+FROM member m;
+
+CREATE OR REPLACE VIEW vw_staff_member_report AS
+SELECT
+    s.member_id,
+    s.member_name,
+    s.member_email,
+    s.member_type,
+    s.member_status,
+
+    s.active_loans_count    AS current_loaned_items,
+    s.total_loans_count     AS total_loans,
+    s.total_fines_count     AS total_fines,
+
+    s.total_fines_amount    AS fines_accrued,
+    s.total_fines_paid      AS paid_fines_value,
+    s.total_fines_balance   AS outstanding_fines_balance
+
+FROM vw_member_account_summary AS s;
+
+--zold
 DROP PROCEDURE IF EXISTS admin_delete_item_copy$$
 CREATE PROCEDURE admin_delete_item_copy(IN p_copy_id INT)
 BEGIN
