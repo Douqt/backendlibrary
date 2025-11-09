@@ -8,6 +8,11 @@ web/node_modules/
 backend/.env
 web/.env
 
+# SSL certificates (local development only)
+*.cert
+*.key
+*.pem
+
 # Logs
 *.log
 

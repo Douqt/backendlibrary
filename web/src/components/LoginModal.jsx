@@ -17,7 +17,8 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
     setError('');
 
     try {
-      const response = await fetch('https://librarydb.duckdns.org/api/auth/login', {
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://librarydb.duckdns.org';
+      const response = await fetch(`${apiUrl}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
