@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Button } from './ui/button';
-import { Library, Menu, User, LogOut } from 'lucide-react';
+import { Library, Menu, User, LogOut, Settings, ChevronDown } from 'lucide-react';
 
-const Header = ({ activeTab, setActiveTab, user, onSignIn, onLogout }) => {
+const Header = ({ activeTab, setActiveTab, user, onSignIn, onLogout, onUpdateInfo }) => {
+  const [showUserMenu, setShowUserMenu] = useState(false);
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -63,15 +65,60 @@ const Header = ({ activeTab, setActiveTab, user, onSignIn, onLogout }) => {
           </Button>
           {user ? (
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 text-sm">
-                <User className="h-4 w-4" />
-                <span className="hidden sm:inline">
-                  {user.user_type === 'staff' ? user.name : user.name}
-                  <span className="text-muted-foreground ml-2 capitalize">
-                    ({user.user_type}{(user.user_type === 'staff' && (user.role === 'admin' || user.position === 'admin')) ? ' admin' : ''})
+              {/* User Menu Dropdown */}
+              {user.user_type === 'member' && (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowUserMenu(!showUserMenu)}
+                    className="flex items-center gap-2 text-sm hover:bg-gray-100 px-3 py-2 rounded-md transition-colors"
+                  >
+                    <User className="h-4 w-4" />
+                    <span className="hidden sm:inline">
+                      {user.name}
+                      <span className="text-muted-foreground ml-2 capitalize">
+                        ({user.user_type})
+                      </span>
+                    </span>
+                    <ChevronDown className="h-3 w-3" />
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {showUserMenu && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setShowUserMenu(false)}
+                      />
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50">
+                        <button
+                          onClick={() => {
+                            setShowUserMenu(false);
+                            onUpdateInfo();
+                          }}
+                          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 transition-colors"
+                        >
+                          <Settings className="h-4 w-4" />
+                          Update Info
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Staff user (no dropdown) */}
+              {user.user_type === 'staff' && (
+                <div className="flex items-center gap-2 text-sm">
+                  <User className="h-4 w-4" />
+                  <span className="hidden sm:inline">
+                    {user.name}
+                    <span className="text-muted-foreground ml-2 capitalize">
+                      ({user.user_type}{(user.role === 'admin' || user.position === 'admin') ? ' admin' : ''})
+                    </span>
                   </span>
-                </span>
-              </div>
+                </div>
+              )}
+
               <Button variant="outline" onClick={onLogout} className="gap-2">
                 <LogOut className="h-4 w-4" />
                 <span className="hidden sm:inline">Sign Out</span>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
+import { API_URL } from '../config/api';
 
 const Checkout = ({ user, searchQuery, onClearSearch, initialCategoryFilter }) => {
   const [availableItems, setAvailableItems] = useState([]);
@@ -31,10 +32,10 @@ const Checkout = ({ user, searchQuery, onClearSearch, initialCategoryFilter }) =
       try {
         setLoading(true);
         const urls = [
-          'https://librarydb.duckdns.org/api/books?available=true',
-          'https://librarydb.duckdns.org/api/movies?available=true',
-          'https://librarydb.duckdns.org/api/articles?available=true',
-          'https://librarydb.duckdns.org/api/electronics?available=true'
+          `${API_URL}/api/books?available=true`,
+          `${API_URL}/api/movies?available=true`,
+          `${API_URL}/api/articles?available=true`,
+          `${API_URL}/api/electronics?available=true`
         ];
 
         if (searchQuery) {
@@ -187,7 +188,7 @@ const Checkout = ({ user, searchQuery, onClearSearch, initialCategoryFilter }) =
         'x-user-id': userData.user_type === 'member' ? userData.member_id : userData.staff_id
       };
 
-      const response = await fetch('https://librarydb.duckdns.org/api/loans', {
+      const response = await fetch(`${API_URL}/api/loans`, {
         method: 'POST',
         headers,
         body: JSON.stringify({

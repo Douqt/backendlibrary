@@ -7,13 +7,18 @@ import Categories from './components/Categories';
 import Checkout from './components/Checkout';
 import FeaturedBooks from './components/FeaturedBooks';
 import LoginModal from './components/LoginModal';
+import RegistrationModal from './components/RegistrationModal';
+import UserInfoModal from './components/UserInfoModal';
 import { Button } from './components/ui/button';
 import { Badge } from './components/ui/badge';
+import { API_URL } from './config/api';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [user, setUser] = useState(null);
   const [loginModal, setLoginModal] = useState(false);
+  const [registrationModal, setRegistrationModal] = useState(false);
+  const [userInfoModal, setUserInfoModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [initialCategoryFilter, setInitialCategoryFilter] = useState(null);
 
@@ -33,7 +38,7 @@ function App() {
 
   const handleLogout = async () => {
     try {
-      await fetch('https://librarydb.duckdns.org/api/auth/logout', {
+      await fetch(`${API_URL}/api/auth/logout`, {
         method: 'POST'
       });
     } catch (error) {
@@ -49,6 +54,26 @@ function App() {
 
   const closeLoginModal = () => {
     setLoginModal(false);
+  };
+
+  const openRegistrationModal = () => {
+    setRegistrationModal(true);
+  };
+
+  const closeRegistrationModal = () => {
+    setRegistrationModal(false);
+  };
+
+  const openUserInfoModal = () => {
+    setUserInfoModal(true);
+  };
+
+  const closeUserInfoModal = () => {
+    setUserInfoModal(false);
+  };
+
+  const handleUserInfoUpdate = (updatedUser) => {
+    setUser(updatedUser);
   };
 
   const scrollToCollections = () => {
@@ -81,6 +106,7 @@ function App() {
         user={user}
         onSignIn={openLoginModal}
         onLogout={handleLogout}
+        onUpdateInfo={openUserInfoModal}
       />
       <main className="w-full">
         {activeTab === 'dashboard' && (
@@ -136,6 +162,20 @@ function App() {
         isOpen={loginModal}
         onClose={closeLoginModal}
         onLogin={handleLogin}
+        onSignUpClick={openRegistrationModal}
+      />
+      <RegistrationModal
+        isOpen={registrationModal}
+        onClose={closeRegistrationModal}
+        onRegistrationSuccess={() => {
+          setLoginModal(true);
+        }}
+      />
+      <UserInfoModal
+        isOpen={userInfoModal}
+        onClose={closeUserInfoModal}
+        user={user}
+        onUpdateSuccess={handleUserInfoUpdate}
       />
     </div>
   );
@@ -162,7 +202,7 @@ function StaffManagement({ user }) {
         'x-user-id': userData.staff_id
       };
 
-      const response = await fetch('https://librarydb.duckdns.org/api/staff', { headers });
+      const response = await fetch(`${API_URL}/api/staff`, { headers });
       const data = await response.json();
       setStaff(data.data || []);
       setLoading(false);
@@ -180,7 +220,7 @@ function StaffManagement({ user }) {
         'x-user-type': userData.user_type,
         'x-user-id': userData.staff_id
       };
-      const response = await fetch('https://librarydb.duckdns.org/api/branches', { headers });
+      const response = await fetch(`${API_URL}/api/branches`, { headers });
       if (response.ok) {
         const data = await response.json();
         setBranches(data.data || []);
@@ -314,8 +354,8 @@ function StaffForm({ staff, branches, onSave, onCancel }) {
       };
 
       const url = staff
-        ? `https://librarydb.duckdns.org/api/staff/${staff.staff_id}`
-        : 'https://librarydb.duckdns.org/api/staff';
+        ? `${API_URL}/api/staff/${staff.staff_id}`
+        : `${API_URL}/api/staff`;
       const method = staff ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
@@ -458,7 +498,7 @@ function Books({ user }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch('https://librarydb.duckdns.org/api/books')
+    fetch(`${API_URL}/api/books`)
       .then(res => res.json())
       .then(data => {
         setBooks(data.data || []);
@@ -481,7 +521,7 @@ function Books({ user }) {
         'x-user-id': user.user_type === 'member' ? user.member_id : user.staff_id
       };
 
-      const response = await fetch('https://librarydb.duckdns.org/api/loans', {
+      const response = await fetch(`${API_URL}/api/loans`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -496,7 +536,7 @@ function Books({ user }) {
         const result = await response.json();
         alert(`Book "${book.title}" has been checked out successfully!`);
         // Refresh books list
-        fetch('https://librarydb.duckdns.org/api/books')
+        fetch(`${API_URL}/api/books`)
           .then(res => res.json())
           .then(data => setBooks(data.data || []))
           .catch(err => console.error('Error refreshing books:', err));
@@ -564,7 +604,7 @@ function Members() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
+  const fetchMembers = () => {
     const user = JSON.parse(localStorage.getItem('user'));
     const headers = {};
     if (user) {
@@ -572,7 +612,7 @@ function Members() {
       headers['x-user-id'] = user.user_type === 'member' ? user.member_id : user.staff_id;
     }
 
-    fetch('https://librarydb.duckdns.org/api/members', { headers })
+    fetch(`${API_URL}/api/members`, { headers })
       .then(res => res.json())
       .then(data => {
         setMembers(data.data || []);
@@ -582,7 +622,46 @@ function Members() {
         setError(err.message);
         setLoading(false);
       });
+  };
+
+  useEffect(() => {
+    fetchMembers();
   }, []);
+
+  const handleStatusChange = async (memberId, newStatus) => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    const member = members.find(m => m.member_id === memberId);
+
+    if (!member) return;
+
+    try {
+      const response = await fetch(`${API_URL}/api/members/${memberId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-type': user.user_type,
+          'x-user-id': user.staff_id
+        },
+        body: JSON.stringify({
+          member_name: member.member_name,
+          member_email: member.member_email,
+          member_type: member.member_type,
+          status: newStatus
+        })
+      });
+
+      if (response.ok) {
+        alert(`Member ${newStatus === 'Active' ? 'approved' : 'status updated'} successfully!`);
+        fetchMembers(); // Refresh the list
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to update status: ${errorData.message}`);
+      }
+    } catch (error) {
+      console.error('Error updating member status:', error);
+      alert('Error updating member status. Please try again.');
+    }
+  };
 
   if (loading) return (
     <div className="py-20 px-4 w-full">
@@ -601,24 +680,69 @@ function Members() {
     </div>
   );
 
+  const pendingMembers = members.filter(m => m.status === 'Pending');
+  const activeMembers = members.filter(m => m.status !== 'Pending');
+
   return (
     <div className="py-20 px-4 w-full">
       <div className="max-w-7xl mx-auto w-full">
         <h2 className="text-4xl font-bold mb-8 text-foreground">Members Management</h2>
-        <div className="members-list">
-          {members.length === 0 ? (
-            <p className="text-muted-foreground">No members found</p>
-          ) : (
-            members.map(member => (
-              <div key={member.member_id} className="member-item">
-                <h3 className="text-xl font-bold text-gray-800 mb-2">{member.member_name}</h3>
-                <p className="text-gray-600 mb-1">Email: {member.member_email}</p>
-                <p className="text-gray-600 mb-1">Type: {member.member_type}</p>
-                <p className="text-gray-600 mb-1">Status: {member.status}</p>
-                <p className="text-gray-600 mb-1">Loans: {member.num_loans}</p>
-              </div>
-            ))
-          )}
+
+        {/* Pending Accounts Section */}
+        {pendingMembers.length > 0 && (
+          <div className="mb-12">
+            <h3 className="text-2xl font-bold mb-4 text-foreground">Pending Accounts ({pendingMembers.length})</h3>
+            <div className="grid gap-4">
+              {pendingMembers.map(member => (
+                <div key={member.member_id} className="border-2 border-yellow-400 bg-yellow-50 p-4 rounded-lg">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="text-xl font-bold text-gray-800 mb-2">{member.member_name}</h4>
+                      <p className="text-gray-600 mb-1">Email: {member.member_email}</p>
+                      <p className="text-gray-600 mb-1">Type: {member.member_type}</p>
+                      <p className="text-gray-600 mb-1">Join Date: {new Date(member.join_date).toLocaleDateString()}</p>
+                      <Badge className="mt-2 bg-yellow-500 text-white">Pending Approval</Badge>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => handleStatusChange(member.member_id, 'Active')}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        onClick={() => handleStatusChange(member.member_id, 'Inactive')}
+                        variant="outline"
+                        className="border-red-600 text-red-600 hover:bg-red-50"
+                      >
+                        Reject
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Active Members Section */}
+        <div>
+          <h3 className="text-2xl font-bold mb-4 text-foreground">All Members ({activeMembers.length})</h3>
+          <div className="members-list grid gap-4">
+            {activeMembers.length === 0 ? (
+              <p className="text-muted-foreground">No members found</p>
+            ) : (
+              activeMembers.map(member => (
+                <div key={member.member_id} className="member-item border p-4 rounded-lg bg-card">
+                  <h4 className="text-xl font-bold text-gray-800 mb-2">{member.member_name}</h4>
+                  <p className="text-gray-600 mb-1">Email: {member.member_email}</p>
+                  <p className="text-gray-600 mb-1">Type: {member.member_type}</p>
+                  <p className="text-gray-600 mb-1">Status: {member.status}</p>
+                  <p className="text-gray-600 mb-1">Loans: {member.num_loans}</p>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -638,7 +762,7 @@ function Loans({ user }) {
       headers['x-user-id'] = user.user_type === 'member' ? user.member_id : user.staff_id;
     }
 
-    fetch('https://librarydb.duckdns.org/api/loans', { headers })
+    fetch(`${API_URL}/api/loans`, { headers })
       .then(res => res.json())
       .then(data => {
         setLoans(data.data || []);
@@ -667,15 +791,18 @@ function Loans({ user }) {
     </div>
   );
 
+  // Filter out returned loans for display
+  const activeLoans = loans.filter(loan => loan.status === 'active');
+
   return (
     <div className="py-20 px-4 w-full">
       <div className="max-w-7xl mx-auto w-full">
         <h2 className="text-4xl font-bold mb-8 text-foreground">Loans Management</h2>
         <div className="loans-list">
-          {loans.length === 0 ? (
-            <p className="text-muted-foreground">No loans found</p>
+          {activeLoans.length === 0 ? (
+            <p className="text-muted-foreground">No active loans found</p>
           ) : (
-            loans.map(loan => (
+            activeLoans.map(loan => (
               <div key={loan.loan_id} className="loan-item border p-4 rounded-lg mb-4 bg-card">
                 <h3 className="text-xl font-bold text-foreground mb-2">
                   {loan.item_title || 'Unknown Item'}
@@ -698,15 +825,25 @@ function Loans({ user }) {
                           'x-user-id': userData.user_type === 'member' ? userData.member_id : userData.staff_id
                         };
 
-                        const response = await fetch(`https://librarydb.duckdns.org/api/loans/${loan.loan_id}`, {
-                          method: 'DELETE',
-                          headers
+                        // Format date for MySQL: YYYY-MM-DD HH:MM:SS
+                        const now = new Date();
+                        const mysqlDateTime = now.getFullYear() + '-' +
+                          String(now.getMonth() + 1).padStart(2, '0') + '-' +
+                          String(now.getDate()).padStart(2, '0') + ' ' +
+                          String(now.getHours()).padStart(2, '0') + ':' +
+                          String(now.getMinutes()).padStart(2, '0') + ':' +
+                          String(now.getSeconds()).padStart(2, '0');
+
+                        const response = await fetch(`${API_URL}/api/loans/${loan.loan_id}`, {
+                          method: 'PUT',
+                          headers,
+                          body: JSON.stringify({ return_ts: mysqlDateTime })
                         });
 
                         if (response.ok) {
                           alert(`"${loan.item_title}" has been returned successfully!`);
                           // Refresh loans list
-                          fetch('https://librarydb.duckdns.org/api/loans', { headers })
+                          fetch(`${API_URL}/api/loans`, { headers })
                             .then(res => res.json())
                             .then(data => setLoans(data.data || []))
                             .catch(err => console.error('Error refreshing loans:', err));
@@ -745,7 +882,7 @@ function Fines({ user }) {
       headers['x-user-id'] = user.user_type === 'member' ? user.member_id : user.staff_id;
     }
 
-    fetch('https://librarydb.duckdns.org/api/fines', { headers })
+    fetch(`${API_URL}/api/fines`, { headers })
       .then(res => res.json())
       .then(data => {
         setFines(data || []);
@@ -774,15 +911,18 @@ function Fines({ user }) {
     </div>
   );
 
+  // Filter out paid fines for display
+  const unpaidFines = fines.filter(fine => fine.payment_status === 'unpaid');
+
   return (
     <div className="py-20 px-4 w-full">
       <div className="max-w-7xl mx-auto w-full">
         <h2 className="text-4xl font-bold mb-8 text-foreground">Fines Management</h2>
         <div className="fines-list">
-          {fines.length === 0 ? (
-            <p className="text-muted-foreground">No fines found</p>
+          {unpaidFines.length === 0 ? (
+            <p className="text-muted-foreground">No unpaid fines found</p>
           ) : (
-            fines.map(fine => (
+            unpaidFines.map(fine => (
               <div key={fine.fine_id} className="fine-item border p-4 rounded-lg mb-4">
                 <h3 className="text-xl font-bold text-gray-800 mb-2">
                   ${fine.amount} Fine - {fine.item_title || 'Unknown Item'}
@@ -799,6 +939,14 @@ function Fines({ user }) {
                   <Button
                     className="mt-2"
                     onClick={async () => {
+                      const confirmPayment = window.confirm(
+                        `Pay fine of $${fine.amount}?\n\n` +
+                        `Reason: ${fine.reason}\n\n` +
+                        `Note: This is a simulated payment. Click OK to mark as paid.`
+                      );
+
+                      if (!confirmPayment) return;
+
                       try {
                         const user = JSON.parse(localStorage.getItem('user'));
                         const headers = {
@@ -807,20 +955,24 @@ function Fines({ user }) {
                           'x-user-id': user.user_type === 'member' ? user.member_id : user.staff_id
                         };
 
-                        const response = await fetch(`https://librarydb.duckdns.org/api/fines/${fine.fine_id}`, {
+                        const response = await fetch(`${API_URL}/api/fines/${fine.fine_id}`, {
                           method: 'PATCH',
                           headers,
                           body: JSON.stringify({ payment_status: 'paid' })
                         });
 
                         if (response.ok) {
-                          // Refresh fines list
-                          const finesResponse = await fetch('https://librarydb.duckdns.org/api/fines', { headers });
-                          const finesData = await finesResponse.json();
-                          setFines(finesData || []);
+                          alert(`Payment of $${fine.amount} processed successfully!`);
+                          // Remove the paid fine from the list
+                          setFines(prevFines => prevFines.filter(f => f.fine_id !== fine.fine_id));
+                        } else {
+                          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                          console.error('Payment failed:', response.status, errorData);
+                          alert(`Failed to process payment: ${errorData.error || errorData.message || 'Please try again.'}`);
                         }
                       } catch (error) {
                         console.error('Error paying fine:', error);
+                        alert(`Error processing payment: ${error.message}. Please check console for details.`);
                       }
                     }}
                   >

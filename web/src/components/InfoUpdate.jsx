@@ -2,11 +2,12 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from './ui/card';
 import { UserCog } from 'lucide-react';
+import { API_URL } from '../config/api';
 
-const API_BASE_URL = 'https://librarydb.duckdns.org/api';
+const API_BASE_URL = API_URL;
 // TODO: Replace `/users/me` with the actual route your backend exposes
 // for fetching/updating the currently logged-in user's info.
-const USER_INFO_ENDPOINT = `${API_BASE_URL}/users/me`;  //ADJUST THIS TO FIT ACTUAL API 
+const USER_INFO_ENDPOINT = `${API_BASE_URL}/api/users/me`;  //ADJUST THIS TO FIT ACTUAL API 
 
 const InfoUpdate = () => {
   const [isOpen, setIsOpen] = useState(false);

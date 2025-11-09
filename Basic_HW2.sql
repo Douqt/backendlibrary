@@ -658,7 +658,14 @@ FOR EACH ROW
 BEGIN
   IF NEW.return_ts IS NOT NULL AND (OLD.return_ts IS NULL OR OLD.return_ts <> NEW.return_ts) THEN
     IF NEW.item_type = 'book' THEN
-      UPDATE books SET copies = copies + 1, available = TRUE WHERE book_id = NEW.item_id;
+      -- Check if there are pending holds for this item
+      IF EXISTS (SELECT 1 FROM hold_requests WHERE item_id = NEW.item_id AND status = 'pending') THEN
+        -- Item has pending holds, increment copies but keep available = FALSE
+        UPDATE books SET copies = copies + 1, available = FALSE WHERE book_id = NEW.item_id;
+      ELSE
+        -- No pending holds, mark as available
+        UPDATE books SET copies = copies + 1, available = TRUE WHERE book_id = NEW.item_id;
+      END IF;
     END IF;
   END IF;
 END$$

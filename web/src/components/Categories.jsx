@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from './ui/card';
 import { Book, FileText, Film, Laptop } from 'lucide-react';
+import { API_URL } from '../config/api';
 
 const Categories = ({ onCategoryClick }) => {
   const [categories, setCategories] = useState([
@@ -44,7 +45,7 @@ const Categories = ({ onCategoryClick }) => {
       try {
         const promises = categories.map(async (category) => {
           try {
-            const response = await fetch(`https://librarydb.duckdns.org/api/${category.api}`);
+            const response = await fetch(`${API_URL}/api/${category.api}`);
             const data = await response.json();
             return data.data ? data.data.length : 0;
           } catch (err) {
