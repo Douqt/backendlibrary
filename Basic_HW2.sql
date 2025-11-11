@@ -81,7 +81,6 @@ CREATE TABLE IF NOT EXISTS item_copy (
 
 CREATE TABLE IF NOT EXISTS staff (
     staff_id INT AUTO_INCREMENT PRIMARY KEY,
-    ssn INT UNIQUE,
     branch_id INT,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255),
