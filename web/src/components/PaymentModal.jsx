@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { X, CreditCard, Loader2, CheckCircle2 } from 'lucide-react';
-import axios from 'axios';
 
 const PaymentModal = ({ fine, onClose, onSuccess }) => {
   const [step, setStep] = useState(1); // 1: Form, 2: Processing, 3: Confirmation
@@ -109,28 +108,27 @@ const PaymentModal = ({ fine, onClose, onSuccess }) => {
       await new Promise(resolve => setTimeout(resolve, 2500));
 
       // Call backend API
-      const API_URL = import.meta.env.VITE_API_URL || 'https://localhost:5000';
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const user = JSON.parse(localStorage.getItem('user'));
-      const response = await axios.post(
-        `${API_URL}/api/payments`,
-        {
+      const response = await fetch(`${API_URL}/api/payments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-type': user.user_type,
+          'x-user-id': user.user_type === 'member' ? user.member_id : user.staff_id
+        },
+        body: JSON.stringify({
           fine_id: fine.fine_id,
           card_number: formData.cardNumber,
           expiration_date: formData.expirationDate,
           cvv: formData.cvv,
           cardholder_name: formData.cardholderName
-        },
-        {
-          headers: {
-            'x-user-type': user.user_type,
-            'x-user-id': user.user_type === 'member' ? user.member_id : user.staff_id
-          },
-          withCredentials: true
-        }
-      );
+        })
+      });
 
-      if (response.data.success) {
-        setPaymentDetails(response.data.payment);
+      const data = await response.json();
+      if (data.success) {
+        setPaymentDetails(data.payment);
         setStep(3); // Move to confirmation step
       }
     } catch (error) {

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { API_BASE_URL } from '../config';
 import { Card, CardContent } from './ui/card';
 import { Book, FileText, Film, Laptop } from 'lucide-react';
-import { API_URL } from '../config/api';
 
-const Categories = ({ onCategoryClick }) => {
+const Categories = () => {
   const [categories, setCategories] = useState([
     {
       icon: Book,
@@ -45,7 +46,7 @@ const Categories = ({ onCategoryClick }) => {
       try {
         const promises = categories.map(async (category) => {
           try {
-            const response = await fetch(`${API_URL}/api/${category.api}`);
+            const response = await fetch(`${API_BASE_URL}/${category.api}`);
             const data = await response.json();
             return data.data ? data.data.length : 0;
           } catch (err) {
@@ -84,27 +85,27 @@ const Categories = ({ onCategoryClick }) => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {categories.map((category, index) => (
-            <Card
-              key={category.title}
-              onClick={() => onCategoryClick && onCategoryClick(category.itemType)}
-              className="group hover:shadow-hover transition-all duration-300 cursor-pointer bg-gradient-card border-border animate-slide-up"
-              style={{ animationDelay: `${index * 0.1}s` }}
-            >
-              <CardContent className="p-6">
-                <div className="mb-4 inline-flex p-3 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                  <category.icon className="h-8 w-8 text-primary" />
-                </div>
-                <h3 className="text-2xl font-bold mb-2 text-foreground">
-                  {category.title}
-                </h3>
-                <p className="text-muted-foreground mb-4">
-                  {category.description}
-                </p>
-                <p className="text-3xl font-bold text-secondary">
-                  {category.count}
-                </p>
-              </CardContent>
-            </Card>
+            <Link key={category.title} to={`/checkout?category=${category.itemType}`}>
+              <Card
+                className="group hover:shadow-hover transition-all duration-300 cursor-pointer bg-gradient-card border-border animate-slide-up"
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
+                <CardContent className="p-6">
+                  <div className="mb-4 inline-flex p-3 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                    <category.icon className="h-8 w-8 text-primary" />
+                  </div>
+                  <h3 className="text-2xl font-bold mb-2 text-foreground">
+                    {category.title}
+                  </h3>
+                  <p className="text-muted-foreground mb-4">
+                    {category.description}
+                  </p>
+                  <p className="text-3xl font-bold text-secondary">
+                    {category.count}
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
       </div>

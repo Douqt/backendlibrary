@@ -1,13 +1,16 @@
 import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Search, Book } from 'lucide-react';
 
-const Hero = ({ onBrowseCollections, onSearchCatalog }) => {
+const Hero = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
-      onSearchCatalog(searchQuery.trim());
+      // Navigate to checkout with search query as URL parameter
+      navigate(`/checkout?search=${encodeURIComponent(searchQuery.trim())}`);
     }
   };
 
@@ -45,15 +48,16 @@ const Hero = ({ onBrowseCollections, onSearchCatalog }) => {
               <Search className="h-5 w-5" />
             </Button>
           </div>
-          <Button
-            size="lg"
-            variant="outline"
-            onClick={onBrowseCollections}
-            className="text-lg px-8 bg-primary-foreground/10 border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/20 w-full"
-          >
-            <Book className="mr-2 h-5 w-5" />
-            Explore Collections
-          </Button>
+          <Link to="/checkout">
+            <Button
+              size="lg"
+              variant="outline"
+              className="text-lg px-8 bg-primary-foreground/10 border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/20 w-full"
+            >
+              <Book className="mr-2 h-5 w-5" />
+              Explore Collections
+            </Button>
+          </Link>
         </div>
       </div>
     </section>

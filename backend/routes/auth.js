@@ -59,7 +59,7 @@ router.post('/register/member', asyncHandler(async (req, res) => {
     // STEP 5: Create member record
     const [memberResult] = await db.query(
         'INSERT INTO member (member_name, member_email, member_type, join_date, status) VALUES (?, ?, ?, CURDATE(), ?)',
-        [member_name, member_email, member_type, 'Pending']
+        [member_name, member_email, member_type, 'Active']
     );
 
     const newMemberId = memberResult.insertId;
@@ -230,17 +230,16 @@ router.post('/login', asyncHandler(async (req, res) => {
     if (memberAuth.length > 0) {
         const user = memberAuth[0];
 
-        // Check password first, then status (prevents account enumeration)
-        if (user.password === password) {
-            // Check if member is active AFTER password verification
-            if (user.status !== 'Active') {
-                return res.status(401).json({
-                    success: false,
-                    message: 'Invalid credentials'
-                });
-            }
+        // Check if member is active
+        if (user.status !== 'Active') {
+            return res.status(403).json({
+                success: false,
+                message: 'Account is not active'
+            });
+        }
 
-            // Password correct and account active
+        // Check password 
+        if (user.password === password) {
             return res.status(200).json({
                 success: true,
                 message: 'Login successful',

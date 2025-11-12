@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { BookOpen } from 'lucide-react';
-import { API_URL } from '../config/api';
 
 const FeaturedBooks = () => {
   const [books, setBooks] = useState([]);
@@ -11,7 +11,7 @@ const FeaturedBooks = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch(`${API_URL}/api/books`)
+    fetch(`${API_BASE_URL}/books`)
       .then(res => res.json())
       .then(data => {
         // Take the first 4 books as featured

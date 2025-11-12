@@ -1,10 +1,16 @@
-import { useState } from 'react';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
-import { Library, Menu, User, LogOut, Settings, ChevronDown, Receipt } from 'lucide-react';
-import NotificationBell from './NotificationBell';
+import { Library, Menu, User, LogOut } from 'lucide-react';
 
-const Header = ({ activeTab, setActiveTab, user, onSignIn, onLogout, onUpdateInfo, onPaymentHistory }) => {
-  const [showUserMenu, setShowUserMenu] = useState(false);
+const Header = ({ user, onSignIn, onLogout }) => {
+  const navigate = useNavigate();
+
+  const handleProfileClick = () => {
+    if (user) {
+      navigate('/profile');
+    }
+  };
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -14,48 +20,160 @@ const Header = ({ activeTab, setActiveTab, user, onSignIn, onLogout, onUpdateInf
         </div>
 
         <nav className="hidden md:flex items-center gap-6">
-          <Button
-            variant={activeTab === 'dashboard' ? 'default' : 'ghost'}
-            onClick={() => setActiveTab('dashboard')}
+          <NavLink
+            to="/"
+            className={({ isActive }) =>
+              `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                isActive
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+              }`
+            }
           >
             Dashboard
-          </Button>
-          <Button
-            variant={activeTab === 'checkout' ? 'default' : 'ghost'}
-            onClick={() => setActiveTab('checkout')}
+          </NavLink>
+          <NavLink
+            to="/checkout"
+            className={({ isActive }) =>
+              `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                isActive
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+              }`
+            }
           >
             Checkout
-          </Button>
+          </NavLink>
           {user && (
             <>
               {(user.user_type === 'staff') && (
-                <Button
-                  variant={activeTab === 'members' ? 'default' : 'ghost'}
-                  onClick={() => setActiveTab('members')}
+                <NavLink
+                  to="/members"
+                  className={({ isActive }) =>
+                    `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                    }`
+                  }
                 >
                   Members
-                </Button>
+                </NavLink>
               )}
               {user.user_type === 'staff' && (user.role === 'admin' || user.position === 'admin') && (
-                <Button
-                  variant={activeTab === 'staff' ? 'default' : 'ghost'}
-                  onClick={() => setActiveTab('staff')}
+                <NavLink
+                  to="/staff"
+                  className={({ isActive }) =>
+                    `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                    }`
+                  }
                 >
                   Staff
-                </Button>
+                </NavLink>
               )}
-              <Button
-                variant={activeTab === 'loans' ? 'default' : 'ghost'}
-                onClick={() => setActiveTab('loans')}
+              <NavLink
+                to="/loans"
+                className={({ isActive }) =>
+                  `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                  }`
+                }
               >
                 Loans
-              </Button>
-              <Button
-                variant={activeTab === 'fines' ? 'default' : 'ghost'}
-                onClick={() => setActiveTab('fines')}
+              </NavLink>
+              <NavLink
+                to="/fines"
+                className={({ isActive }) =>
+                  `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                  }`
+                }
               >
                 Fines
-              </Button>
+              </NavLink>
+              <NavLink
+                to="/holds"
+                className={({ isActive }) =>
+                  `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                  }`
+                }
+              >
+                Holds
+              </NavLink>
+              <NavLink
+                to="/events"
+                className={({ isActive }) =>
+                  `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                  }`
+                }
+              >
+                Events
+              </NavLink>
+              <NavLink
+                to="/services"
+                className={({ isActive }) =>
+                  `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-accent'
+                  }`
+                }
+              >
+                Services
+              </NavLink>
+              <NavLink
+                to="/reservations"
+                className={({ isActive }) =>
+                  `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                  }`
+                }
+              >
+                Reservations
+              </NavLink>
+              {user.user_type === 'member' && (
+                <NavLink
+                  to="/payment-history"
+                  className={({ isActive }) =>
+                    `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                    }`
+                  }
+                >
+                  Payments
+                </NavLink>
+              )}
+              {user.user_type === 'staff' && (user.role === 'admin' || user.position === 'admin') && (
+                <NavLink
+                  to="/admin-report"
+                  className={({ isActive }) =>
+                    `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                    }`
+                  }
+                >
+                  Reports
+                </NavLink>
+              )}
             </>
           )}
         </nav>
@@ -65,84 +183,40 @@ const Header = ({ activeTab, setActiveTab, user, onSignIn, onLogout, onUpdateInf
             <Menu className="h-5 w-5" />
           </Button>
           {user ? (
-            <div className="flex items-center gap-3">
-              {/* Notification Bell */}
-              <NotificationBell user={user} setActiveTab={setActiveTab} />
-
-              {/* User Menu Dropdown */}
-              {user.user_type === 'member' && (
-                <div className="relative">
-                  <button
-                    onClick={() => setShowUserMenu(!showUserMenu)}
-                    className="flex items-center gap-2 text-sm hover:bg-gray-100 px-3 py-2 rounded-md transition-colors"
-                  >
-                    <User className="h-4 w-4" />
-                    <span className="hidden sm:inline">
-                      {user.name}
-                      <span className="text-muted-foreground ml-2 capitalize">
-                        ({user.user_type})
-                      </span>
-                    </span>
-                    <ChevronDown className="h-3 w-3" />
-                  </button>
-
-                  {/* Dropdown Menu */}
-                  {showUserMenu && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-40"
-                        onClick={() => setShowUserMenu(false)}
-                      />
-                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50">
-                        <button
-                          onClick={() => {
-                            setShowUserMenu(false);
-                            onUpdateInfo();
-                          }}
-                          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 transition-colors border-b border-gray-100"
-                        >
-                          <Settings className="h-4 w-4" />
-                          Update Info
-                        </button>
-                        <button
-                          onClick={() => {
-                            setShowUserMenu(false);
-                            onPaymentHistory();
-                          }}
-                          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 transition-colors"
-                        >
-                          <Receipt className="h-4 w-4" />
-                          Payment History
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* Staff user (no dropdown) */}
-              {user.user_type === 'staff' && (
-                <div className="flex items-center gap-2 text-sm">
-                  <User className="h-4 w-4" />
-                  <span className="hidden sm:inline">
-                    {user.name}
-                    <span className="text-muted-foreground ml-2 capitalize">
-                      ({user.user_type}{(user.role === 'admin' || user.position === 'admin') ? ' admin' : ''})
-                    </span>
+            <div className="flex items-center gap-4 ml-4">
+              <button
+                onClick={handleProfileClick}
+                className="flex items-center gap-2 text-sm min-w-0 hover:bg-accent px-2 py-1 rounded-md transition-colors cursor-pointer"
+                title="Click to view/edit profile"
+              >
+                <User className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden sm:inline truncate">
+                  {user.user_type === 'staff' ? user.name : user.name}
+                  <span className="text-muted-foreground ml-2 capitalize">
+                    ({user.user_type}{(user.user_type === 'staff' && (user.role === 'admin' || user.position === 'admin')) ? ' admin' : ''})
                   </span>
-                </div>
-              )}
-
-              <Button variant="outline" onClick={onLogout} className="gap-2">
+                </span>
+              </button>
+              <Button variant="outline" onClick={onLogout} className="gap-2 flex-shrink-0">
                 <LogOut className="h-4 w-4" />
                 <span className="hidden sm:inline">Sign Out</span>
               </Button>
             </div>
           ) : (
-            <Button variant="outline" onClick={onSignIn} className="gap-2">
-              <User className="h-4 w-4" />
-              <span className="hidden sm:inline">Sign In</span>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Link to="/signin">
+                <Button variant="outline" className="gap-2">
+                  <User className="h-4 w-4" />
+                  <span className="hidden sm:inline">Sign In</span>
+                </Button>
+              </Link>
+              <Link to="/signup">
+                <Button className="gap-2">
+                  <User className="h-4 w-4" />
+                  <span className="hidden sm:inline">Sign Up</span>
+                </Button>
+              </Link>
+            </div>
           )}
         </div>
       </div>

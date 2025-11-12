@@ -1,29 +1,27 @@
 import { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 import Header from './components/Header';
+import { API_BASE_URL } from './config';
 
 import Hero from './components/Hero';
 import Categories from './components/Categories';
 import Checkout from './components/Checkout';
 import FeaturedBooks from './components/FeaturedBooks';
 import LoginModal from './components/LoginModal';
-import RegistrationModal from './components/RegistrationModal';
-import UserInfoModal from './components/UserInfoModal';
-import PaymentModal from './components/PaymentModal';
+import Signup from './components/Signup';
+import SignIn from './components/SignIn';
+import Profile from './components/Profile';
+import NotificationBell from './components/NotificationBell';
 import PaymentHistory from './components/PaymentHistory';
+import PaymentModal from './components/PaymentModal';
+import AdminSUMM_Report from './components/AdminSUMM_Report';
 import { Button } from './components/ui/button';
 import { Badge } from './components/ui/badge';
-import { API_URL } from './config/api';
 
 function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
   const [user, setUser] = useState(null);
   const [loginModal, setLoginModal] = useState(false);
-  const [registrationModal, setRegistrationModal] = useState(false);
-  const [userInfoModal, setUserInfoModal] = useState(false);
-  const [paymentHistoryModal, setPaymentHistoryModal] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [initialCategoryFilter, setInitialCategoryFilter] = useState(null);
 
   // Check for existing session on mount
   useEffect(() => {
@@ -41,7 +39,7 @@ function App() {
 
   const handleLogout = async () => {
     try {
-      await fetch(`${API_URL}/api/auth/logout`, {
+      await fetch(`${API_BASE_URL}/auth/logout`, {
         method: 'POST'
       });
     } catch (error) {
@@ -60,142 +58,159 @@ function App() {
     setLoginModal(false);
   };
 
-  const openRegistrationModal = () => {
-    setRegistrationModal(true);
-  };
-
-  const closeRegistrationModal = () => {
-    setRegistrationModal(false);
-  };
-
-  const openUserInfoModal = () => {
-    setUserInfoModal(true);
-  };
-
-  const closeUserInfoModal = () => {
-    setUserInfoModal(false);
-  };
-
-  const handleUserInfoUpdate = (updatedUser) => {
-    setUser(updatedUser);
-  };
-
-  const openPaymentHistoryModal = () => {
-    setPaymentHistoryModal(true);
-  };
-
-  const closePaymentHistoryModal = () => {
-    setPaymentHistoryModal(false);
-  };
-
-  const scrollToCollections = () => {
-    document.getElementById('collections')?.scrollIntoView({
-      behavior: 'smooth'
-    });
-  };
-
-  const handleSearch = (query) => {
-    setSearchQuery(query);
-    setActiveTab('checkout');
-    // Checkout component will handle fetching with search query
-  };
-
-  const handleCategoryClick = (itemType) => {
-    // Navigate to checkout tab with specific filter applied
-    setInitialCategoryFilter(itemType);
-    setActiveTab('checkout');
-  };
-
-  const clearSearch = () => {
-    setSearchQuery('');
-  };
-
   return (
-    <div className="min-h-screen bg-background w-full">
-      <Header
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        user={user}
-        onSignIn={openLoginModal}
-        onLogout={handleLogout}
-        onUpdateInfo={openUserInfoModal}
-        onPaymentHistory={openPaymentHistoryModal}
-      />
-      <main className="w-full">
-        {activeTab === 'dashboard' && (
-          <>
-            <Hero
-              onBrowseCollections={scrollToCollections}
-              onSearchCatalog={handleSearch}
-            />
-            <Categories onCategoryClick={handleCategoryClick} />
-            <FeaturedBooks />
-          </>
-        )}
-        {activeTab === 'checkout' && <Checkout user={user} searchQuery={searchQuery} initialCategoryFilter={initialCategoryFilter} onClearSearch={clearSearch} />}
-        {activeTab === 'members' && (user?.user_type === 'staff' ? <Members /> : (
-          <div className="py-20 px-4 w-full">
-            <div className="max-w-7xl mx-auto w-full text-center">
-              <h2 className="text-4xl font-bold mb-8 text-foreground">Access Denied</h2>
-              <p className="text-muted-foreground mb-4">You need to be logged in as staff to view members.</p>
-              <Button onClick={openLoginModal}>Sign In</Button>
-            </div>
-          </div>
-        ))}
-        {activeTab === 'loans' && (user ? <Loans user={user} /> : (
-          <div className="py-20 px-4 w-full">
-            <div className="max-w-7xl mx-auto w-full text-center">
-              <h2 className="text-4xl font-bold mb-8 text-foreground">Please Sign In</h2>
-              <p className="text-muted-foreground mb-4">You need to be logged in to view your loans.</p>
-              <Button onClick={openLoginModal}>Sign In</Button>
-            </div>
-          </div>
-        ))}
-        {activeTab === 'staff' && (user && user.user_type === 'staff' && (user.role === 'admin' || user.position === 'admin') ? <StaffManagement user={user} /> : (
-          <div className="py-20 px-4 w-full">
-            <div className="max-w-7xl mx-auto w-full text-center">
-              <h2 className="text-4xl font-bold mb-8 text-foreground">Access Denied</h2>
-              <p className="text-muted-foreground mb-4">You need to be logged in as an admin to manage staff.</p>
-              <Button onClick={openLoginModal}>Sign In</Button>
-            </div>
-          </div>
-        ))}
-        {activeTab === 'fines' && (user ? <Fines user={user} /> : (
-          <div className="py-20 px-4 w-full">
-            <div className="max-w-7xl mx-auto w-full text-center">
-              <h2 className="text-4xl font-bold mb-8 text-foreground">Please Sign In</h2>
-              <p className="text-muted-foreground mb-4">You need to be logged in to view your fines.</p>
-              <Button onClick={openLoginModal}>Sign In</Button>
-            </div>
-          </div>
-        ))}
-      </main>
-
-      <LoginModal
-        isOpen={loginModal}
-        onClose={closeLoginModal}
-        onLogin={handleLogin}
-        onSignUpClick={openRegistrationModal}
-      />
-      <RegistrationModal
-        isOpen={registrationModal}
-        onClose={closeRegistrationModal}
-        onRegistrationSuccess={() => {
-          setLoginModal(true);
-        }}
-      />
-      <UserInfoModal
-        isOpen={userInfoModal}
-        onClose={closeUserInfoModal}
-        user={user}
-        onUpdateSuccess={handleUserInfoUpdate}
-      />
-      {paymentHistoryModal && (
-        <PaymentHistory
-          onClose={closePaymentHistoryModal}
+    <Router>
+      <div className="min-h-screen bg-background w-full">
+        <Header
+          user={user}
+          onSignIn={openLoginModal}
+          onLogout={handleLogout}
         />
-      )}
-    </div>
+        <main className="w-full">
+          <Routes>
+            <Route path="/" element={
+              <>
+                <Hero />
+                <Categories />
+                <FeaturedBooks />
+              </>
+            } />
+            <Route path="/checkout" element={<Checkout user={user} />} />
+            <Route path="/profile" element={
+              user ? <Profile user={user} /> : (
+                <div className="py-20 px-4 w-full">
+                  <div className="max-w-7xl mx-auto w-full text-center">
+                    <h2 className="text-4xl font-bold mb-8 text-foreground">Please Sign In</h2>
+                    <p className="text-muted-foreground mb-4">You need to be logged in to view your profile.</p>
+                    <Button onClick={openLoginModal}>Sign In</Button>
+                  </div>
+                </div>
+              )
+            } />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/signin" element={<SignIn onLogin={handleLogin} />} />
+            <Route path="/loans" element={
+              user ? <Loans user={user} /> : (
+                <div className="py-20 px-4 w-full">
+                  <div className="max-w-7xl mx-auto w-full text-center">
+                    <h2 className="text-4xl font-bold mb-8 text-foreground">Please Sign In</h2>
+                    <p className="text-muted-foreground mb-4">You need to be logged in to view your loans.</p>
+                    <Button onClick={openLoginModal}>Sign In</Button>
+                  </div>
+                </div>
+              )
+            } />
+            <Route path="/fines" element={
+              user ? <Fines user={user} /> : (
+                <div className="py-20 px-4 w-full">
+                  <div className="max-w-7xl mx-auto w-full text-center">
+                    <h2 className="text-4xl font-bold mb-8 text-foreground">Please Sign In</h2>
+                    <p className="text-muted-foreground mb-4">You need to be logged in to view your fines.</p>
+                    <Button onClick={openLoginModal}>Sign In</Button>
+                  </div>
+                </div>
+              )
+            } />
+            <Route path="/holds" element={
+              user ? <HoldRequests user={user} /> : (
+                <div className="py-20 px-4 w-full">
+                  <div className="max-w-7xl mx-auto w-full text-center">
+                    <h2 className="text-4xl font-bold mb-8 text-foreground">Please Sign In</h2>
+                    <p className="text-muted-foreground mb-4">You need to be logged in to manage holds.</p>
+                    <Button onClick={openLoginModal}>Sign In</Button>
+                  </div>
+                </div>
+              )
+            } />
+            <Route path="/events" element={
+              user ? <Events user={user} /> : (
+                <div className="py-20 px-4 w-full">
+                  <div className="max-w-7xl mx-auto w-full text-center">
+                    <h2 className="text-4xl font-bold mb-8 text-foreground">Please Sign In</h2>
+                    <p className="text-muted-foreground mb-4">You need to be logged in to view events.</p>
+                    <Button onClick={openLoginModal}>Sign In</Button>
+                  </div>
+                </div>
+              )
+            } />
+            <Route path="/services" element={
+              user ? <Services user={user} /> : (
+                <div className="py-20 px-4 w-full">
+                  <div className="max-w-7xl mx-auto w-full text-center">
+                    <h2 className="text-4xl font-bold mb-8 text-foreground">Please Sign In</h2>
+                    <p className="text-muted-foreground mb-4">You need to be logged in to view services.</p>
+                    <Button onClick={openLoginModal}>Sign In</Button>
+                  </div>
+                </div>
+              )
+            } />
+            <Route path="/reservations" element={
+              user ? <Reservations user={user} /> : (
+                <div className="py-20 px-4 w-full">
+                  <div className="max-w-7xl mx-auto w-full text-center">
+                    <h2 className="text-4xl font-bold mb-8 text-foreground">Please Sign In</h2>
+                    <p className="text-muted-foreground mb-4">You need to be logged in to manage reservations.</p>
+                    <Button onClick={openLoginModal}>Sign In</Button>
+                  </div>
+                </div>
+              )
+            } />
+            <Route path="/payment-history" element={
+              user ? <PaymentHistory user={user} /> : (
+                <div className="py-20 px-4 w-full">
+                  <div className="max-w-7xl mx-auto w-full text-center">
+                    <h2 className="text-4xl font-bold mb-8 text-foreground">Please Sign In</h2>
+                    <p className="text-muted-foreground mb-4">You need to be logged in to view payment history.</p>
+                    <Button onClick={openLoginModal}>Sign In</Button>
+                  </div>
+                </div>
+              )
+            } />
+            <Route path="/admin-report" element={
+              user && user.user_type === 'staff' && (user.role === 'admin' || user.position === 'admin') ? <AdminSUMM_Report user={user} /> : (
+                <div className="py-20 px-4 w-full">
+                  <div className="max-w-7xl mx-auto w-full text-center">
+                    <h2 className="text-4xl font-bold mb-8 text-foreground">Access Denied</h2>
+                    <p className="text-muted-foreground mb-4">You need to be logged in as an admin to view reports.</p>
+                    <Button onClick={openLoginModal}>Sign In</Button>
+                  </div>
+                </div>
+              )
+            } />
+            <Route path="/members" element={
+              user?.user_type === 'staff' ? <Members /> : (
+                <div className="py-20 px-4 w-full">
+                  <div className="max-w-7xl mx-auto w-full text-center">
+                    <h2 className="text-4xl font-bold mb-8 text-foreground">Access Denied</h2>
+                    <p className="text-muted-foreground mb-4">You need to be logged in as staff to view members.</p>
+                    <Button onClick={openLoginModal}>Sign In</Button>
+                  </div>
+                </div>
+              )
+            } />
+            <Route path="/staff" element={
+              user && user.user_type === 'staff' && (user.role === 'admin' || user.position === 'admin') ? <StaffManagement user={user} /> : (
+                <div className="py-20 px-4 w-full">
+                  <div className="max-w-7xl mx-auto w-full text-center">
+                    <h2 className="text-4xl font-bold mb-8 text-foreground">Access Denied</h2>
+                    <p className="text-muted-foreground mb-4">You need to be logged in as an admin to manage staff.</p>
+                    <Button onClick={openLoginModal}>Sign In</Button>
+                  </div>
+                </div>
+              )
+            } />
+            {/* Redirect unknown routes to home */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
+
+        <LoginModal
+          isOpen={loginModal}
+          onClose={closeLoginModal}
+          onLogin={handleLogin}
+        />
+      </div>
+    </Router>
   );
 }
 
@@ -220,7 +235,7 @@ function StaffManagement({ user }) {
         'x-user-id': userData.staff_id
       };
 
-      const response = await fetch(`${API_URL}/api/staff`, { headers });
+      const response = await fetch(`${API_BASE_URL}/staff`, { headers });
       const data = await response.json();
       setStaff(data.data || []);
       setLoading(false);
@@ -238,7 +253,7 @@ function StaffManagement({ user }) {
         'x-user-type': userData.user_type,
         'x-user-id': userData.staff_id
       };
-      const response = await fetch(`${API_URL}/api/branches`, { headers });
+      const response = await fetch(`${API_BASE_URL}/branches`, { headers });
       if (response.ok) {
         const data = await response.json();
         setBranches(data.data || []);
@@ -395,8 +410,8 @@ function StaffForm({ staff, branches, onSave, onCancel }) {
       };
 
       const url = staff
-        ? `${API_URL}/api/staff/${staff.staff_id}`
-        : `${API_URL}/api/staff`;
+        ? `${API_BASE_URL}/staff/${staff.staff_id}`
+        : `${API_BASE_URL}/staff`;
       const method = staff ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
@@ -539,7 +554,7 @@ function Books({ user }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch(`${API_URL}/api/books`)
+    fetch(`${API_BASE_URL}/books`)
       .then(res => res.json())
       .then(data => {
         setBooks(data.data || []);
@@ -562,7 +577,7 @@ function Books({ user }) {
         'x-user-id': user.user_type === 'member' ? user.member_id : user.staff_id
       };
 
-      const response = await fetch(`${API_URL}/api/loans`, {
+      const response = await fetch(`${API_BASE_URL}/loans`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -577,7 +592,7 @@ function Books({ user }) {
         const result = await response.json();
         alert(`Book "${book.title}" has been checked out successfully!`);
         // Refresh books list
-        fetch(`${API_URL}/api/books`)
+        fetch(`${API_BASE_URL}/books`)
           .then(res => res.json())
           .then(data => setBooks(data.data || []))
           .catch(err => console.error('Error refreshing books:', err));
@@ -645,7 +660,7 @@ function Members() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const fetchMembers = () => {
+  useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user'));
     const headers = {};
     if (user) {
@@ -653,7 +668,7 @@ function Members() {
       headers['x-user-id'] = user.user_type === 'member' ? user.member_id : user.staff_id;
     }
 
-    fetch(`${API_URL}/api/members`, { headers })
+    fetch(`${API_BASE_URL}/members`, { headers })
       .then(res => res.json())
       .then(data => {
         setMembers(data.data || []);
@@ -663,46 +678,7 @@ function Members() {
         setError(err.message);
         setLoading(false);
       });
-  };
-
-  useEffect(() => {
-    fetchMembers();
   }, []);
-
-  const handleStatusChange = async (memberId, newStatus) => {
-    const user = JSON.parse(localStorage.getItem('user'));
-    const member = members.find(m => m.member_id === memberId);
-
-    if (!member) return;
-
-    try {
-      const response = await fetch(`${API_URL}/api/members/${memberId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-type': user.user_type,
-          'x-user-id': user.staff_id
-        },
-        body: JSON.stringify({
-          member_name: member.member_name,
-          member_email: member.member_email,
-          member_type: member.member_type,
-          status: newStatus
-        })
-      });
-
-      if (response.ok) {
-        alert(`Member ${newStatus === 'Active' ? 'approved' : 'status updated'} successfully!`);
-        fetchMembers(); // Refresh the list
-      } else {
-        const errorData = await response.json();
-        alert(`Failed to update status: ${errorData.message}`);
-      }
-    } catch (error) {
-      console.error('Error updating member status:', error);
-      alert('Error updating member status. Please try again.');
-    }
-  };
 
   if (loading) return (
     <div className="py-20 px-4 w-full">
@@ -721,69 +697,24 @@ function Members() {
     </div>
   );
 
-  const pendingMembers = members.filter(m => m.status === 'Pending');
-  const activeMembers = members.filter(m => m.status !== 'Pending');
-
   return (
     <div className="py-20 px-4 w-full">
       <div className="max-w-7xl mx-auto w-full">
         <h2 className="text-4xl font-bold mb-8 text-foreground">Members Management</h2>
-
-        {/* Pending Accounts Section */}
-        {pendingMembers.length > 0 && (
-          <div className="mb-12">
-            <h3 className="text-2xl font-bold mb-4 text-foreground">Pending Accounts ({pendingMembers.length})</h3>
-            <div className="grid gap-4">
-              {pendingMembers.map(member => (
-                <div key={member.member_id} className="border-2 border-yellow-400 bg-yellow-50 p-4 rounded-lg">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="text-xl font-bold text-gray-800 mb-2">{member.member_name}</h4>
-                      <p className="text-gray-600 mb-1">Email: {member.member_email}</p>
-                      <p className="text-gray-600 mb-1">Type: {member.member_type}</p>
-                      <p className="text-gray-600 mb-1">Join Date: {new Date(member.join_date).toLocaleDateString()}</p>
-                      <Badge className="mt-2 bg-yellow-500 text-white">Pending Approval</Badge>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() => handleStatusChange(member.member_id, 'Active')}
-                        className="bg-green-600 hover:bg-green-700"
-                      >
-                        Approve
-                      </Button>
-                      <Button
-                        onClick={() => handleStatusChange(member.member_id, 'Inactive')}
-                        variant="outline"
-                        className="border-red-600 text-red-600 hover:bg-red-50"
-                      >
-                        Reject
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Active Members Section */}
-        <div>
-          <h3 className="text-2xl font-bold mb-4 text-foreground">All Members ({activeMembers.length})</h3>
-          <div className="members-list grid gap-4">
-            {activeMembers.length === 0 ? (
-              <p className="text-muted-foreground">No members found</p>
-            ) : (
-              activeMembers.map(member => (
-                <div key={member.member_id} className="member-item border p-4 rounded-lg bg-card">
-                  <h4 className="text-xl font-bold text-gray-800 mb-2">{member.member_name}</h4>
-                  <p className="text-gray-600 mb-1">Email: {member.member_email}</p>
-                  <p className="text-gray-600 mb-1">Type: {member.member_type}</p>
-                  <p className="text-gray-600 mb-1">Status: {member.status}</p>
-                  <p className="text-gray-600 mb-1">Loans: {member.num_loans}</p>
-                </div>
-              ))
-            )}
-          </div>
+        <div className="members-list">
+          {members.length === 0 ? (
+            <p className="text-muted-foreground">No members found</p>
+          ) : (
+            members.map(member => (
+              <div key={member.member_id} className="member-item">
+                <h3 className="text-xl font-bold text-gray-800 mb-2">{member.member_name}</h3>
+                <p className="text-gray-600 mb-1">Email: {member.member_email}</p>
+                <p className="text-gray-600 mb-1">Type: {member.member_type}</p>
+                <p className="text-gray-600 mb-1">Status: {member.status}</p>
+                <p className="text-gray-600 mb-1">Loans: {member.num_loans}</p>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
@@ -803,7 +734,7 @@ function Loans({ user }) {
       headers['x-user-id'] = user.user_type === 'member' ? user.member_id : user.staff_id;
     }
 
-    fetch(`${API_URL}/api/loans`, { headers })
+    fetch(`${API_BASE_URL}/loans`, { headers })
       .then(res => res.json())
       .then(data => {
         setLoans(data.data || []);
@@ -832,79 +763,105 @@ function Loans({ user }) {
     </div>
   );
 
-  // Filter out returned loans for display
-  const activeLoans = loans.filter(loan => loan.status === 'active');
+  // Separate active and returned loans
+  const activeLoans = loans.filter(loan => !loan.return_ts && loan.status !== 'returned');
+  const returnedLoans = loans.filter(loan => loan.return_ts || loan.status === 'returned');
+
+  const renderLoanCard = (loan) => (
+    <div key={loan.loan_id} className="border border-border rounded-lg p-6 bg-card hover:shadow-md transition-shadow">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex-1">
+          <h3 className="text-lg font-semibold text-foreground mb-1">
+            {loan.item_title || 'Unknown Item'}
+          </h3>
+          {user && user.user_type === 'staff' && (
+            <p className="text-sm text-muted-foreground mb-2">Loan ID: {loan.loan_id}</p>
+          )}
+          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+            <span>Status: <span className={`font-medium ${loan.status === 'active' ? 'text-green-600' : loan.status === 'overdue' ? 'text-red-600' : 'text-gray-600'}`}>{loan.status}</span></span>
+            <span>Due: {new Date(loan.due_date).toLocaleDateString()}</span>
+            {loan.return_ts && (
+              <span>Returned: {new Date(loan.return_ts).toLocaleDateString()}</span>
+            )}
+          </div>
+        </div>
+        {loan.status === 'active' && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              try {
+                const userData = JSON.parse(localStorage.getItem('user'));
+                const headers = {
+                  'Content-Type': 'application/json',
+                  'x-user-type': userData.user_type,
+                  'x-user-id': userData.user_type === 'member' ? userData.member_id : userData.staff_id
+                };
+
+                const response = await fetch(`${API_BASE_URL}/loans/${loan.loan_id}`, {
+                  method: 'PUT',
+                  headers,
+                  body: JSON.stringify({ return_ts: new Date().toISOString().split('T')[0] })
+                });
+
+                if (response.ok) {
+                  alert(`"${loan.item_title}" has been returned successfully!`);
+                  // Refresh loans list
+                  fetch(`${API_BASE_URL}/loans`, { headers })
+                    .then(res => res.json())
+                    .then(data => setLoans(data.data || []))
+                    .catch(err => console.error('Error refreshing loans:', err));
+                } else {
+                  const errorData = await response.json();
+                  alert(`Return failed: ${errorData.message}`);
+                }
+              } catch (error) {
+                console.error('Return error:', error);
+                alert('Return failed due to network error');
+              }
+            }}
+          >
+            Return Item
+          </Button>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="py-20 px-4 w-full">
       <div className="max-w-7xl mx-auto w-full">
-        <h2 className="text-4xl font-bold mb-8 text-foreground">Loans Management</h2>
-        <div className="loans-list">
+        <h2 className="text-4xl font-bold mb-8 text-foreground">My Loans</h2>
+
+        {/* Active Loans Section */}
+        <div className="mb-12">
+          <h3 className="text-2xl font-semibold mb-6 text-foreground">Active Loans ({activeLoans.length})</h3>
           {activeLoans.length === 0 ? (
-            <p className="text-muted-foreground">No active loans found</p>
+            <div className="text-center py-8 bg-muted/30 rounded-lg">
+              <p className="text-muted-foreground">No active loans</p>
+            </div>
           ) : (
-            activeLoans.map(loan => (
-              <div key={loan.loan_id} className="loan-item border p-4 rounded-lg mb-4 bg-card">
-                <h3 className="text-xl font-bold text-foreground mb-2">
-                  {loan.item_title || 'Unknown Item'}
-                </h3>
-                {user && user.user_type === 'staff' && (
-                  <p className="text-muted-foreground text-sm mb-1">Loan ID: {loan.loan_id}</p>
-                )}
-                <p className="text-muted-foreground mb-1">Status: {loan.status}</p>
-                <p className="text-muted-foreground mb-3">Due Date: {new Date(loan.due_date).toLocaleDateString()}</p>
-
-                {loan.status === 'active' && (
-                  <Button
-                    variant="outline"
-                    onClick={async () => {
-                      try {
-                        const userData = JSON.parse(localStorage.getItem('user'));
-                        const headers = {
-                          'Content-Type': 'application/json',
-                          'x-user-type': userData.user_type,
-                          'x-user-id': userData.user_type === 'member' ? userData.member_id : userData.staff_id
-                        };
-
-                        // Format date for MySQL: YYYY-MM-DD HH:MM:SS
-                        const now = new Date();
-                        const mysqlDateTime = now.getFullYear() + '-' +
-                          String(now.getMonth() + 1).padStart(2, '0') + '-' +
-                          String(now.getDate()).padStart(2, '0') + ' ' +
-                          String(now.getHours()).padStart(2, '0') + ':' +
-                          String(now.getMinutes()).padStart(2, '0') + ':' +
-                          String(now.getSeconds()).padStart(2, '0');
-
-                        const response = await fetch(`${API_URL}/api/loans/${loan.loan_id}`, {
-                          method: 'PUT',
-                          headers,
-                          body: JSON.stringify({ return_ts: mysqlDateTime })
-                        });
-
-                        if (response.ok) {
-                          alert(`"${loan.item_title}" has been returned successfully!`);
-                          // Refresh loans list
-                          fetch(`${API_URL}/api/loans`, { headers })
-                            .then(res => res.json())
-                            .then(data => setLoans(data.data || []))
-                            .catch(err => console.error('Error refreshing loans:', err));
-                        } else {
-                          const errorData = await response.json();
-                          alert(`Return failed: ${errorData.message}`);
-                        }
-                      } catch (error) {
-                        console.error('Return error:', error);
-                        alert('Return failed due to network error');
-                      }
-                    }}
-                  >
-                    Return Item
-                  </Button>
-                )}
-              </div>
-            ))
+            <div className="space-y-4">
+              {activeLoans.map(renderLoanCard)}
+            </div>
           )}
         </div>
+
+        {/* Returned Loans Section */}
+        {returnedLoans.length > 0 && (
+          <div>
+            <h3 className="text-2xl font-semibold mb-6 text-foreground">Loan History ({returnedLoans.length})</h3>
+            <div className="space-y-4">
+              {returnedLoans.map(renderLoanCard)}
+            </div>
+          </div>
+        )}
+
+        {loans.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-xl text-muted-foreground">No loans found</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -925,7 +882,7 @@ function Fines({ user }) {
       headers['x-user-id'] = user.user_type === 'member' ? user.member_id : user.staff_id;
     }
 
-    fetch(`${API_URL}/api/fines`, { headers })
+    fetch(`${API_BASE_URL}/fines`, { headers })
       .then(res => res.json())
       .then(data => {
         setFines(data || []);
@@ -958,59 +915,420 @@ function Fines({ user }) {
     </div>
   );
 
-  // Filter out paid fines for display
-  const unpaidFines = fines.filter(fine => fine.payment_status === 'unpaid');
-
   return (
     <div className="py-20 px-4 w-full">
       <div className="max-w-7xl mx-auto w-full">
         <h2 className="text-4xl font-bold mb-8 text-foreground">Fines Management</h2>
-        <div className="fines-list">
-          {unpaidFines.length === 0 ? (
-            <p className="text-muted-foreground">No unpaid fines found</p>
+        <div className="space-y-4">
+          {fines.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-xl text-muted-foreground">No fines found</p>
+            </div>
           ) : (
-            unpaidFines.map(fine => (
-              <div key={fine.fine_id} className="fine-item border p-4 rounded-lg mb-4">
-                <h3 className="text-xl font-bold text-gray-800 mb-2">
-                  ${fine.amount} Fine - {fine.item_title || 'Unknown Item'}
-                </h3>
-                {user?.user_type === 'staff' && (
-                  <p className="text-gray-500 text-sm mb-1">Fine ID: {fine.fine_id}</p>
-                )}
-                <p className="text-gray-600 mb-1">Reason: {fine.reason}</p>
-                <p className="text-gray-600 mb-1">Status: {fine.payment_status}</p>
-                {user?.user_type === 'staff' && (
-                  <p className="text-gray-600 mb-1">Member: {fine.member_name}</p>
-                )}
-                {fine.payment_status === 'unpaid' && (
-                  <Button
-                    className="mt-2"
-                    onClick={() => {
-                      setSelectedFine(fine);
-                      setPaymentModalOpen(true);
-                    }}
-                  >
-                    Pay Fine
-                  </Button>
-                )}
+            fines.map(fine => (
+              <div key={fine.fine_id} className="border border-border rounded-lg p-6 bg-card hover:shadow-md transition-shadow">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-foreground mb-1">
+                      ${fine.amount} Fine - {fine.item_title || 'Unknown Item'}
+                    </h3>
+                    {user?.user_type === 'staff' && (
+                      <p className="text-sm text-muted-foreground mb-2">Fine ID: {fine.fine_id}</p>
+                    )}
+                    <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                      <span>Reason: {fine.reason}</span>
+                      <span>Status: <span className={`font-medium ${fine.payment_status === 'paid' ? 'text-green-600' : 'text-red-600'}`}>{fine.payment_status}</span></span>
+                      {user?.user_type === 'staff' && (
+                        <span>Member: {fine.member_name}</span>
+                      )}
+                    </div>
+                  </div>
+                  {fine.payment_status === 'unpaid' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          const user = JSON.parse(localStorage.getItem('user'));
+                          const headers = {
+                            'Content-Type': 'application/json',
+                            'x-user-type': user.user_type,
+                            'x-user-id': user.user_type === 'member' ? user.member_id : user.staff_id
+                          };
+
+                          const response = await fetch(`${API_BASE_URL}/fines/${fine.fine_id}`, {
+                            method: 'PATCH',
+                            headers,
+                            body: JSON.stringify({ payment_status: 'paid' })
+                          });
+
+                          if (response.ok) {
+                            // Refresh fines list
+                            const finesResponse = await fetch(`${API_BASE_URL}/fines`, { headers });
+                            const finesData = await finesResponse.json();
+                            setFines(finesData || []);
+                          }
+                        } catch (error) {
+                          console.error('Error paying fine:', error);
+                        }
+                      }}
+                    >
+                      Pay Fine
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HoldRequests({ user }) {
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [availableItems, setAvailableItems] = useState([]);
+
+  const fetchRequests = async () => {
+    try {
+      const userData = JSON.parse(localStorage.getItem('user'));
+      const headers = {
+        'x-user-type': userData.user_type,
+        'x-user-id': userData.user_type === 'member' ? userData.member_id : userData.staff_id
+      };
+
+      const response = await fetch(`${API_BASE_URL}/hold-requests`, { headers });
+      const data = await response.json();
+      setRequests(data.data || []);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching hold requests:', error);
+      setError(error.message);
+      setLoading(false);
+    }
+  };
+
+  const fetchAvailableItems = async () => {
+    try {
+      const urls = [
+        `${API_BASE_URL}/books?available=true`,
+        `${API_BASE_URL}/movies?available=true`,
+        `${API_BASE_URL}/articles?available=true`,
+        `${API_BASE_URL}/electronics?available=true`
+      ];
+
+      const promises = urls.map(url => fetch(url).then(res => res.json()));
+      const responses = await Promise.all(promises);
+      const allItems = [];
+
+      // Add books
+      if (responses[0].data) {
+        responses[0].data.forEach(book => {
+          allItems.push({
+            id: `book-${book.book_id}`,
+            title: book.title,
+            type: 'book',
+            itemId: book.book_id
+          });
+        });
+      }
+
+      // Add movies
+      if (responses[1].data) {
+        responses[1].data.forEach(movie => {
+          allItems.push({
+            id: `movie-${movie.movie_id}`,
+            title: movie.title,
+            type: 'movie',
+            itemId: movie.movie_id
+          });
+        });
+      }
+
+      // Add articles
+      if (responses[2].data) {
+        responses[2].data.forEach(article => {
+          allItems.push({
+            id: `article-${article.artic_id}`,
+            title: article.title,
+            type: 'article',
+            itemId: article.artic_id
+          });
+        });
+      }
+
+      // Add electronics
+      if (responses[3].data) {
+        responses[3].data.forEach(device => {
+          allItems.push({
+            id: `electronic-${device.libra_id}`,
+            title: device.device_name,
+            type: 'electronic',
+            itemId: device.libra_id
+          });
+        });
+      }
+
+      setAvailableItems(allItems);
+    } catch (error) {
+      console.error('Error fetching available items:', error);
+    }
+  };
+
+  const handleCreateRequest = async (itemId) => {
+    try {
+      const userData = JSON.parse(localStorage.getItem('user'));
+      const headers = {
+        'Content-Type': 'application/json',
+        'x-user-type': userData.user_type,
+        'x-user-id': userData.member_id
+      };
+
+      const response = await fetch(`${API_BASE_URL}/hold-requests`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          member_id: userData.member_id,
+          item_id: itemId
+        })
+      });
+
+      if (response.ok) {
+        alert('Hold request created successfully!');
+        fetchRequests();
+        setShowForm(false);
+      } else {
+        const error = await response.json();
+        alert(`Error: ${error.message}`);
+      }
+    } catch (error) {
+      console.error('Error creating hold request:', error);
+      alert('Error creating hold request');
+    }
+  };
+
+  const handleCancelRequest = async (requestId) => {
+    try {
+      const userData = JSON.parse(localStorage.getItem('user'));
+      const headers = {
+        'Content-Type': 'application/json',
+        'x-user-type': userData.user_type,
+        'x-user-id': userData.user_type === 'member' ? userData.member_id : userData.staff_id
+      };
+
+      const response = await fetch(`${API_BASE_URL}/hold-requests/${requestId}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ status: 'canceled' })
+      });
+
+      if (response.ok) {
+        alert('Hold request canceled successfully!');
+        fetchRequests();
+      } else {
+        const error = await response.json();
+        alert(`Error: ${error.message}`);
+      }
+    } catch (error) {
+      console.error('Error canceling hold request:', error);
+      alert('Error canceling hold request');
+    }
+  };
+
+  const handleFulfillRequest = async (requestId) => {
+    try {
+      const userData = JSON.parse(localStorage.getItem('user'));
+      const headers = {
+        'x-user-type': userData.user_type,
+        'x-user-id': userData.staff_id
+      };
+
+      const response = await fetch(`${API_BASE_URL}/hold-requests/${requestId}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ status: 'fulfilled' })
+      });
+
+      if (response.ok) {
+        alert('Hold request fulfilled successfully!');
+        fetchRequests();
+      } else {
+        const error = await response.json();
+        alert(`Error: ${error.message}`);
+      }
+    } catch (error) {
+      console.error('Error fulfilling hold request:', error);
+      alert('Error fulfilling hold request');
+    }
+  };
+
+  useEffect(() => {
+    fetchRequests();
+    if (user.user_type === 'member') {
+      fetchAvailableItems();
+    }
+  }, [user]);
+
+  if (loading) return (
+    <div className="py-20 px-4 w-full">
+      <div className="max-w-7xl mx-auto w-full">
+        <h2 className="text-4xl font-bold mb-8 text-foreground">Holds Management</h2>
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    </div>
+  );
+
+  if (error) return (
+    <div className="py-20 px-4 w-full">
+      <div className="max-w-7xl mx-auto w-full">
+        <h2 className="text-4xl font-bold mb-8 text-foreground">Holds Management</h2>
+        <p className="text-red-500">Error: {error}</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="py-20 px-4 w-full">
+      <div className="max-w-7xl mx-auto w-full">
+        <div className="mb-8 flex justify-between items-center">
+          <h2 className="text-4xl font-bold text-foreground">Holds Management</h2>
+          {user.user_type === 'member' && (
+            <Button onClick={() => setShowForm(true)}>
+              Create Hold
+            </Button>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          {requests.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-xl text-muted-foreground">No hold requests found</p>
+            </div>
+          ) : (
+            requests.map(request => (
+              <div key={request.request_id} className="border border-border rounded-lg p-6 bg-card hover:shadow-md transition-shadow">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-foreground mb-1">
+                      {request.item_title || 'Unknown Item'}
+                    </h3>
+                    <p className="text-sm text-muted-foreground mb-2">{request.member_name}</p>
+                    <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                      <span>Queue Position: {request.queue_position}</span>
+                      <span>Priority Score: {request.priority_score}</span>
+                      <span>Requested: {new Date(request.request_date).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:items-end gap-2">
+                    <Badge className={`${
+                      request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                      request.status === 'fulfilled' ? 'bg-green-100 text-green-800' :
+                      request.status === 'canceled' ? 'bg-red-100 text-red-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {request.status}
+                    </Badge>
+                    {request.status === 'pending' && (
+                      <div className="flex gap-2">
+                        {user.user_type === 'member' && request.member_id === user.member_id && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCancelRequest(request.request_id)}
+                          >
+                            Cancel
+                          </Button>
+                        )}
+                        {user.user_type === 'staff' && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleFulfillRequest(request.request_id)}
+                          >
+                            Fulfill
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             ))
           )}
         </div>
 
-        {/* Payment Modal */}
-        {paymentModalOpen && selectedFine && (
-          <PaymentModal
-            fine={selectedFine}
-            onClose={() => {
-              setPaymentModalOpen(false);
-              setSelectedFine(null);
-            }}
-            onSuccess={() => {
-              fetchFines(); // Refresh the fines list
-            }}
-          />
+        {/* Create Hold Request Form Modal */}
+        {showForm && user.user_type === 'member' && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+            <div className="bg-card p-6 rounded-lg w-full max-w-md">
+              <h3 className="text-xl font-bold mb-4 text-foreground">Create Hold</h3>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Select Item</label>
+                  <select
+                    className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleCreateRequest(parseInt(e.target.value.split('-')[1]));
+                      }
+                    }}
+                  >
+                    <option value="">Choose an item...</option>
+                    {availableItems.map(item => (
+                      <option key={item.id} value={item.id}>
+                        {item.title} ({item.type})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex gap-2 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function Events({ user }) {
+  return (
+    <div className="py-20 px-4 w-full">
+      <div className="max-w-7xl mx-auto w-full">
+        <h2 className="text-4xl font-bold mb-8 text-foreground">Events Management</h2>
+        <p className="text-muted-foreground">Events feature coming soon...</p>
+      </div>
+    </div>
+  );
+}
+
+function Services({ user }) {
+  return (
+    <div className="py-20 px-4 w-full">
+      <div className="max-w-7xl mx-auto w-full">
+        <h2 className="text-4xl font-bold mb-8 text-foreground">Services Management</h2>
+        <p className="text-muted-foreground">Services feature coming soon...</p>
+      </div>
+    </div>
+  );
+}
+
+function Reservations({ user }) {
+  return (
+    <div className="py-20 px-4 w-full">
+      <div className="max-w-7xl mx-auto w-full">
+        <h2 className="text-4xl font-bold mb-8 text-foreground">Reservations Management</h2>
+        <p className="text-muted-foreground">Reservations feature coming soon...</p>
       </div>
     </div>
   );

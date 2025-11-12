@@ -119,10 +119,10 @@ router.put('/:id', asyncHandler(async(req, res) => {
     }
 
     //validate status enum if provided
-    if(status && !['Active', 'Inactive', 'Closed', 'Pending'].includes(status)){
+    if(status && !['Active', 'Inactive', 'Closed'].includes(status)){
         return res.status(400).json({
             success: false,
-            message: 'Status must be one of the following: "Active", "Inactive", "Closed", or "Pending"'
+            message: 'Status must be one of the following: "Active", "Inactive", or "Closed"'
         });
     }
 
@@ -204,125 +204,6 @@ router.delete('/:id', asyncHandler(async (req, res) => {
     res.json({
         success: true,
         message: 'Member account closed successfully'
-    });
-}));
-
-// POST /api/members/me/update - Update current user's info (name, username, and/or password)
-router.post('/me/update', asyncHandler(async (req, res) => {
-    const { member_name, username, current_password, new_password } = req.body;
-
-    // Get user info from headers
-    const userType = req.headers['x-user-type'];
-    const userId = req.headers['x-user-id'];
-
-    // Verify user is a member
-    if (userType !== 'member') {
-        return res.status(403).json({
-            success: false,
-            message: 'This endpoint is only for members'
-        });
-    }
-
-    if (!userId) {
-        return res.status(401).json({
-            success: false,
-            message: 'Authentication required'
-        });
-    }
-
-    // Validate that at least one field is being updated
-    if (!member_name && !username && !new_password) {
-        return res.status(400).json({
-            success: false,
-            message: 'Please provide member_name, username, or new_password to update'
-        });
-    }
-
-    // Get current member data
-    const [members] = await db.query(
-        'SELECT m.member_id, m.member_name, m.member_email, m.member_type, ma.password, ma.username FROM member m JOIN member_auth ma ON m.member_id = ma.member_id WHERE m.member_id = ?',
-        [userId]
-    );
-
-    if (members.length === 0) {
-        return res.status(404).json({
-            success: false,
-            message: 'Member not found'
-        });
-    }
-
-    const member = members[0];
-
-    // If updating username, check if it's already taken
-    if (username && username !== member.username) {
-        const [existingUsername] = await db.query(
-            'SELECT username FROM member_auth WHERE username = ? UNION SELECT username FROM staff_auth WHERE username = ?',
-            [username, username]
-        );
-
-        if (existingUsername.length > 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Username is already taken'
-            });
-        }
-
-        // Update username
-        await db.query(
-            'UPDATE member_auth SET username = ? WHERE member_id = ?',
-            [username, userId]
-        );
-    }
-
-    // If updating password, verify current password
-    if (new_password) {
-        if (!current_password) {
-            return res.status(400).json({
-                success: false,
-                message: 'Current password is required to change password'
-            });
-        }
-
-        if (member.password !== current_password) {
-            return res.status(401).json({
-                success: false,
-                message: 'Current password is incorrect'
-            });
-        }
-
-        if (new_password.length < 6) {
-            return res.status(400).json({
-                success: false,
-                message: 'New password must be at least 6 characters long'
-            });
-        }
-
-        // Update password
-        await db.query(
-            'UPDATE member_auth SET password = ? WHERE member_id = ?',
-            [new_password, userId]
-        );
-    }
-
-    // Update member name if provided
-    if (member_name) {
-        await db.query(
-            'UPDATE member SET member_name = ? WHERE member_id = ?',
-            [member_name, userId]
-        );
-    }
-
-    // Return updated user data
-    res.json({
-        success: true,
-        message: 'Information updated successfully',
-        data: {
-            member_id: member.member_id,
-            member_name: member_name || member.member_name,
-            member_email: member.member_email,
-            member_type: member.member_type,
-            username: username || member.username
-        }
     });
 }));
 

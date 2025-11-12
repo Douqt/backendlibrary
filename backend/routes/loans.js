@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const asyncHandler = require('../middleware/asyncHandler');
+const fineService = require('../services/fineService');
+const priorityQueueService = require('../services/priorityQueueService');
 
 // Middleware to extract user info from headers
 const getUserFromRequest = (req) => {
@@ -108,19 +110,36 @@ router.get('/:id', asyncHandler(async (req, res) => {
 
 // POST /api/loans - Create new loan
 router.post('/', asyncHandler(async (req, res) => {
-  const { member_id, item_id, item_type, branch_id, due_date } = req.body;
+  const { member_id, item_id, item_type: requestItemType, branch_id, due_date } = req.body;
 
   // Validate required fields
-  if (!member_id || !item_id || !item_type) {
+  if (!member_id || !item_id || !requestItemType) {
     return res.status(400).json({
       success: false,
       message: 'member_id, item_id, and item_type are required'
     });
   }
 
+  // Parse prefixed item_id to determine type and actual ID
+  // book-1, movie-1, article-1, electronic-1
+  let actualItemId, finalItemType;
+  const itemIdStr = String(item_id); // Ensure it's a string
+  if (itemIdStr.includes('-')) {
+    const parts = itemIdStr.split('-');
+    const parsedItemType = parts[0];
+    actualItemId = parseInt(parts[1]);
+
+    // Use parsed type, converting 'electronic' to 'electronic_rental'
+    finalItemType = parsedItemType === 'electronic' ? 'electronic_rental' : parsedItemType;
+  } else {
+    // Fallback for non-prefixed IDs
+    actualItemId = parseInt(itemIdStr);
+    finalItemType = requestItemType || 'book'; // Use the provided item_type or default to book
+  }
+
   // Validate item_type enum
   const validItemTypes = ['book', 'movie', 'article', 'electronic_rental'];
-  if (!validItemTypes.includes(item_type)) {
+  if (!validItemTypes.includes(finalItemType)) {
     return res.status(400).json({
       success: false,
       message: `item_type must be one of: ${validItemTypes.join(', ')}`
@@ -142,16 +161,27 @@ router.post('/', asyncHandler(async (req, res) => {
 
   const member = members[0];
 
-  // Check for unpaid fines (prevents trigger error)
-  const [fines] = await db.query(
-    "SELECT COUNT(*) as fine_count FROM fines WHERE member_id = ? AND payment_status != 'paid'",
-    [member_id]
-  );
-
-  if (fines[0].fine_count > 0) {
+  // Check for unpaid fines using service
+  const hasUnpaidFines = await fineService.hasUnpaidFines(member_id);
+  if (hasUnpaidFines) {
     return res.status(400).json({
       success: false,
       message: 'Member has unpaid fines and cannot borrow items'
+    });
+  }
+
+  // Check if member already has this item loaned (prevent duplicate loans)
+  // For duplicate checking, we need to compare against the actual item_id and type
+  // But since we store composite IDs, we need to check if a composite ID for the same item already exists
+  const [existingLoan] = await db.query(
+    'SELECT loan_id FROM loan WHERE member_id = ? AND item_type = ? AND return_ts IS NULL AND item_id = ?',
+    [member_id, finalItemType, actualItemId]
+  );
+
+  if (existingLoan.length > 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Member already has this item loaned. Cannot loan the same item twice.'
     });
   }
 
@@ -171,11 +201,11 @@ router.post('/', asyncHandler(async (req, res) => {
     });
   }
 
-  // Check if book is available (only for books, extend for other types as needed)
-  if (item_type === 'book') {
+  // Check if item is available (extend for other types as needed)
+  if (finalItemType === 'book') {
     const [books] = await db.query(
       'SELECT book_id, copies, available FROM books WHERE book_id = ?',
-      [item_id]
+      [actualItemId]
     );
 
     if (books.length === 0) {
@@ -191,6 +221,63 @@ router.post('/', asyncHandler(async (req, res) => {
         message: 'Book is not available for checkout'
       });
     }
+  } else if (finalItemType === 'movie') {
+    const [movies] = await db.query(
+      'SELECT movie_id, copy_amount, available FROM movies WHERE movie_id = ?',
+      [actualItemId]
+    );
+
+    if (movies.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Movie not found'
+      });
+    }
+
+    if (movies[0].copy_amount <= 0 || !movies[0].available) {
+      return res.status(400).json({
+        success: false,
+        message: 'Movie is not available for checkout'
+      });
+    }
+  } else if (finalItemType === 'article') {
+    const [articles] = await db.query(
+      'SELECT artic_id, copies, available FROM articles WHERE artic_id = ?',
+      [actualItemId]
+    );
+
+    if (articles.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Article not found'
+      });
+    }
+
+    if (articles[0].copies <= 0 || !articles[0].available) {
+      return res.status(400).json({
+        success: false,
+        message: 'Article is not available for checkout'
+      });
+    }
+  } else if (finalItemType === 'electronic_rental') {
+    const [electronics] = await db.query(
+      'SELECT libra_id, copy_amount, available FROM electronics WHERE libra_id = ?',
+      [actualItemId]
+    );
+
+    if (electronics.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Electronic item not found'
+      });
+    }
+
+    if (electronics[0].copy_amount <= 0 || !electronics[0].available) {
+      return res.status(400).json({
+        success: false,
+        message: 'Electronic item is not available for checkout'
+      });
+    }
   }
 
   // Calculate due date if not provided (default 14 days)
@@ -198,11 +285,17 @@ router.post('/', asyncHandler(async (req, res) => {
     .toISOString()
     .split('T')[0];
 
-  // Create the loan (triggers handle inventory automatically)
+  // Create the loan
   const [result] = await db.query(
     `INSERT INTO loan (member_id, item_id, item_type, branch_id, due_date)
      VALUES (?, ?, ?, ?, ?)`,
-    [member_id, item_id, item_type, branch_id || null, calculatedDueDate]
+    [member_id, actualItemId, finalItemType, branch_id || null, calculatedDueDate]
+  );
+
+  // Update member's last checkout date
+  await db.query(
+    'UPDATE member SET date_last_checked_out = CURDATE() WHERE member_id = ?',
+    [member_id]
   );
 
   res.status(201).json({
@@ -211,8 +304,8 @@ router.post('/', asyncHandler(async (req, res) => {
     data: {
       loan_id: result.insertId,
       member_id,
-      item_id,
-      item_type,
+      item_id: actualItemId,
+      item_type: finalItemType,
       branch_id,
       due_date: calculatedDueDate
     }
@@ -224,9 +317,9 @@ router.put('/:id', asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { return_ts } = req.body;
 
-  // Check if loan exists
+  // Check if loan exists and get item details
   const [loans] = await db.query(
-    'SELECT loan_id, return_ts FROM loan WHERE loan_id = ?',
+    'SELECT loan_id, item_id, item_type, return_ts FROM loan WHERE loan_id = ?',
     [id]
   );
 
@@ -237,20 +330,44 @@ router.put('/:id', asyncHandler(async (req, res) => {
     });
   }
 
-  if (loans[0].return_ts !== null) {
+  const loan = loans[0];
+
+  if (loan.return_ts !== null) {
     return res.status(400).json({
       success: false,
       message: 'Loan has already been returned'
     });
   }
 
-  // Update return timestamp (trigger handles inventory restoration)
+  // Update return timestamp
   const returnDate = return_ts || new Date().toISOString().split('T')[0];
 
   await db.query(
     'UPDATE loan SET return_ts = ? WHERE loan_id = ?',
     [returnDate, id]
   );
+
+  // Handle inventory restoration and hold request fulfillment
+  if (loan.item_type === 'book') {
+    // Always increment copies and make available if copies > 0
+    // Hold requests don't prevent checkout - they just queue up
+    await db.query(
+      'UPDATE books SET copies = copies + 1, available = CASE WHEN copies + 1 > 0 THEN TRUE ELSE FALSE END WHERE book_id = ?',
+      [loan.item_id]
+    );
+
+    // Check if there are pending hold requests and fulfill the next one
+    const [pendingHolds] = await db.query(
+      'SELECT COUNT(*) as count FROM hold_requests WHERE item_id = ? AND status = "pending"',
+      [loan.item_id]
+    );
+
+    if (pendingHolds[0].count > 0) {
+      // Fulfill the next hold request in the priority queue
+      await priorityQueueService.fulfillNextRequest(loan.item_id);
+    }
+  }
+  // TODO: Add similar logic for movies, articles, and electronics when needed
 
   res.json({
     success: true,

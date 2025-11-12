@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Receipt, CreditCard } from 'lucide-react';
-import axios from 'axios';
-import { API_URL } from '../config/api';
+import { API_BASE_URL } from '../config';
 
 const PaymentHistory = ({ onClose }) => {
   const [payments, setPayments] = useState([]);
@@ -23,21 +22,20 @@ const PaymentHistory = ({ onClose }) => {
         return;
       }
 
-      const response = await axios.get(`${API_URL}/api/payments`, {
+      const response = await fetch(`${API_BASE_URL}/payments`, {
         headers: {
           'x-user-type': user.user_type,
           'x-user-id': user.user_type === 'member' ? user.member_id : user.staff_id
-        },
-        withCredentials: true
+        }
       });
 
-      console.log('Payment history response:', response.data);
-      setPayments(response.data.payments || []);
+      const data = await response.json();
+      console.log('Payment history response:', data);
+      setPayments(data.payments || []);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching payment history:', error);
-      console.error('Error details:', error.response?.data);
-      setError(error.response?.data?.error || error.message || 'Failed to load payment history');
+      setError(error.message || 'Failed to load payment history');
       setLoading(false);
     }
   };

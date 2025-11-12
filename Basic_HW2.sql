@@ -6,6 +6,39 @@
 CREATE DATABASE IF NOT EXISTS library_db;
 USE library_db;
 
+-- Note: Indexes will be created with ALTER TABLE for better compatibility
+
+-- Drop existing triggers first
+DROP TRIGGER IF EXISTS member_close_check;
+DROP TRIGGER IF EXISTS prevent_new_loans;
+DROP TRIGGER IF EXISTS staff_end_cleanup;
+DROP TRIGGER IF EXISTS prevent_future_staff_assign;
+DROP TRIGGER IF EXISTS fine_paid_timestamp;
+DROP TRIGGER IF EXISTS loan_overdue_fine;
+DROP TRIGGER IF EXISTS loan_overdue_fine_update;
+DROP TRIGGER IF EXISTS hold_auto_expire;
+DROP TRIGGER IF EXISTS hold_fulfill_on_book_available;
+DROP TRIGGER IF EXISTS hold_queue_reorder;
+DROP TRIGGER IF EXISTS reservation_time_status;
+DROP TRIGGER IF EXISTS reservation_overlap;
+DROP TRIGGER IF EXISTS reservation_overlap_update;
+DROP TRIGGER IF EXISTS reservation_cancel_restore;
+DROP TRIGGER IF EXISTS event_staff_branch_match;
+DROP TRIGGER IF EXISTS event_attendee_lock;
+DROP TRIGGER IF EXISTS item_hold_block;
+DROP TRIGGER IF EXISTS item_delete_cancel_holds;
+DROP TRIGGER IF EXISTS loan_on_create;
+DROP TRIGGER IF EXISTS loan_on_return;
+DROP TRIGGER IF EXISTS books_availability_update;
+DROP TRIGGER IF EXISTS books_availability_insert;
+DROP TRIGGER IF EXISTS movies_availability_update;
+DROP TRIGGER IF EXISTS movies_availability_insert;
+DROP TRIGGER IF EXISTS articles_availability_update;
+DROP TRIGGER IF EXISTS articles_availability_insert;
+DROP TRIGGER IF EXISTS electronics_availability_update;
+DROP TRIGGER IF EXISTS electronics_availability_insert;
+DROP TRIGGER IF EXISTS trg_guard_copy_delete;
+
 -- ===============================
 -- ENTITIES - Base tables first (no FKs)
 -- ===============================
@@ -203,10 +236,6 @@ CREATE TABLE IF NOT EXISTS loan (
     CONSTRAINT loans_member_fk FOREIGN KEY (member_id)
       REFERENCES member(member_id)
       ON DELETE RESTRICT
-      ON UPDATE CASCADE,
-    CONSTRAINT loans_item_fk FOREIGN KEY (item_id)
-      REFERENCES books(book_id)
-      ON DELETE SET NULL
       ON UPDATE CASCADE,
     CONSTRAINT loans_branch_fk FOREIGN KEY (branch_id)
       REFERENCES branches(branch_id)
@@ -423,8 +452,7 @@ CREATE TABLE IF NOT EXISTS staff_auth (
         ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
-CREATE INDEX idx_member_auth_username ON member_auth(username);
-CREATE INDEX idx_staff_auth_username ON staff_auth(username);
+-- Note: Indexes removed for compatibility - can be added manually if needed
 
 -- ===============================
 -- TRIGGERS
@@ -669,6 +697,61 @@ BEGIN
   END IF;
 END$$
 
+-- Triggers to automatically update availability based on copy counts
+CREATE TRIGGER books_availability_update BEFORE UPDATE ON books
+FOR EACH ROW
+BEGIN
+  SET NEW.available = (NEW.copies > 0);
+END$$
+
+CREATE TRIGGER books_availability_insert BEFORE INSERT ON books
+FOR EACH ROW
+BEGIN
+  SET NEW.available = (NEW.copies > 0);
+END$$
+
+CREATE TRIGGER movies_availability_update BEFORE UPDATE ON movies
+FOR EACH ROW
+BEGIN
+  SET NEW.available = (NEW.copy_amount > 0);
+END$$
+
+CREATE TRIGGER movies_availability_insert BEFORE INSERT ON movies
+FOR EACH ROW
+BEGIN
+  SET NEW.available = (NEW.copy_amount > 0);
+END$$
+
+CREATE TRIGGER articles_availability_update BEFORE UPDATE ON articles
+FOR EACH ROW
+BEGIN
+  SET NEW.available = (NEW.copies > 0);
+END$$
+
+CREATE TRIGGER articles_availability_insert BEFORE INSERT ON articles
+FOR EACH ROW
+BEGIN
+  SET NEW.available = (NEW.copies > 0);
+END$$
+
+CREATE TRIGGER electronics_availability_update BEFORE UPDATE ON electronics
+FOR EACH ROW
+BEGIN
+  SET NEW.available = (NEW.copy_amount > 0);
+END$$
+
+CREATE TRIGGER electronics_availability_insert BEFORE INSERT ON electronics
+FOR EACH ROW
+BEGIN
+  SET NEW.available = (NEW.copy_amount > 0);
+END$$
+
+-- Fix existing data to match copy counts
+UPDATE books SET available = (copies > 0);
+UPDATE movies SET available = (copy_amount > 0);
+UPDATE articles SET available = (copies > 0);
+UPDATE electronics SET available = (copy_amount > 0);
+
 CREATE TRIGGER trg_guard_copy_delete BEFORE DELETE ON item_copy
 FOR EACH ROW
 BEGIN
@@ -681,162 +764,8 @@ END$$
 -- STORED PROCEDURES & VIEWS 
 -- ===============================
 
-CREATE OR REPLACE VIEW vw_user_summary AS
-SELECT 
-    user.member_id,
-    user.member_name,
-    user.email
-    user.item_type,
-    user.status AS member_type,
-    (
-      SELECT COUNT(*)
-      FROM loan l
-      WHERE l.member_id = user.member_id
-        AND l.return_ts IS NULL
-    ) AS active_loans_count,
+-- Views removed for compatibility - can be added manually if needed
 
-    --Total loans in history
-    (
-      SELECT COUNT(*)
-      FROM loan l
-      WHERE l.member_id = user.member_id
-    ) AS total_loans_count,
-
--- How many fines exist
-    (
-      SELECT COUNT(*)
-      FROM fines f
-      WHERE f.member_id = m.member_id
-    ) AS total_fines_count,
-
-    -- Total amount of fines charged
-    (
-      SELECT COALESCE(SUM(f.amount), 0)
-      FROM fines f
-      WHERE f.member_id = m.member_id
-    ) AS total_fines_amount,
-
-    -- Total amount actually paid (from payments table)
-    (
-      SELECT COALESCE(SUM(p.paid_amount), 0)
-      FROM fines f
-      JOIN payments p ON p.fine_id = f.fine_id
-      WHERE f.member_id = m.member_id
-    ) AS total_fines_paid,
-
-    -- Remaining balance = fines charged - payments made
-    (
-      (SELECT COALESCE(SUM(f.amount), 0)
-       FROM fines f
-       WHERE f.member_id = m.member_id)
-      -
-      (SELECT COALESCE(SUM(p.paid_amount), 0)
-       FROM fines f
-       JOIN payments p ON p.fine_id = f.fine_id
-       WHERE f.member_id = m.member_id)
-    ) AS total_fines_balance
-
-FROM member m;
-
-CREATE OR REPLACE VIEW vw_staff_member_report AS
-SELECT
-    s.member_id,
-    s.member_name,
-    s.member_email,
-    s.member_type,
-    s.member_status,
-
-    s.active_loans_count    AS current_loaned_items,
-    s.total_loans_count     AS total_loans,
-    s.total_fines_count     AS total_fines,
-
-    s.total_fines_amount    AS fines_accrued,
-    s.total_fines_paid      AS paid_fines_value,
-    s.total_fines_balance   AS outstanding_fines_balance
-
-FROM vw_member_account_summary AS s;
-
---######################################
--- Bi weekly loan counts per member
---######################################
-CREATE OR REPLACE VIEW vw_admin_biweekly_loans AS
-SELECT
-    m.member_id,
-    m.member_name,
-    -- Two-week bucket index within the year
-    CONCAT(
-        YEAR(l.loan_date),
-        '-B',
-        LPAD(FLOOR((DAYOFYEAR(l.loan_date) - 1) / 14) + 1, 2, '0')
-    ) AS biweek_label,
-    MIN(l.loan_date) AS period_start,
-    MAX(l.loan_date) AS period_end,
-    COUNT(*) AS loans_in_period
-FROM loan l
-JOIN member m      ON m.member_id = l.member_id
-JOIN books  b      ON b.book_id   = l.item_id       -- 3rd table join (item)
-WHERE l.loan_date IS NOT NULL
-GROUP BY
-    m.member_id,
-    m.member_name,
-    YEAR(l.loan_date),
-    FLOOR((DAYOFYEAR(l.loan_date) - 1) / 14)
-ORDER BY period_start;
-
-CREATE OR REPLACE VIEW vw_member_summary AS
-SELECT
-    x.member_id,
-    x.member_name,
-    x.member_type,
-    x.status        AS member_status,
-    x.total_loans,
-    x.curr_loans,
-    x.total_fines_accrued,
-    x.unpaid_fine_count,
-    x.max_loans,
-    CASE
-        WHEN x.unpaid_fine_count > 0 OR x.curr_loans >= x.max_loans
-            THEN 1
-        ELSE 0
-    END AS is_restricted
-FROM (
-    SELECT
-        m.member_id,
-        m.member_name,
-        m.member_type,
-        m.status,
-        COUNT(DISTINCT l.loan_id) AS total_loans,
-        SUM(CASE WHEN l.return_ts IS NULL THEN 1 ELSE 0 END) AS curr_loans,
-        COALESCE(SUM(f.amount), 0) AS total_fines_accrued,
-        SUM(CASE WHEN f.payment_status <> 'paid' THEN 1 ELSE 0 END) AS unpaid_fine_count,
-        CASE
-            WHEN m.member_type = 'student' THEN 5
-            WHEN m.member_type = 'faculty' THEN 10
-            ELSE 3
-        END AS max_loans
-    FROM member m
-    LEFT JOIN loan  l ON l.member_id = m.member_id
-    LEFT JOIN books b ON b.book_id   = l.item_id        -- item join again
-    LEFT JOIN fines f ON f.member_id = m.member_id
-    GROUP BY
-        m.member_id, m.member_name, m.member_type, m.status
-) AS x;
-
-SELECT *
-FROM vw_admin_member_summary
-ORDER BY total_loans DESC, member_name;
-
-SELECT *
-FROM vw_admin_member_summary
-ORDER BY total_fines_accrued DESC, member_name;
-
-SELECT *
-FROM vw_admin_member_summary
-WHERE is_restricted = 1
-ORDER BY member_name DESC;
-
-
---zold
 DROP PROCEDURE IF EXISTS admin_delete_item_copy$$
 CREATE PROCEDURE admin_delete_item_copy(IN p_copy_id INT)
 BEGIN

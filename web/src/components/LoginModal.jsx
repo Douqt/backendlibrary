@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Button } from './ui/button';
+import { API_BASE_URL } from '../config';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from './ui/card';
 import { X } from 'lucide-react';
-import { API_URL } from '../config/api';
 
-const LoginModal = ({ isOpen, onClose, onLogin, onSignUpClick }) => {
+const LoginModal = ({ isOpen, onClose, onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,14 +18,14 @@ const LoginModal = ({ isOpen, onClose, onLogin, onSignUpClick }) => {
     setError('');
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/login`, {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ username, password }),
       });
-      
+
       const data = await response.json();
 
       if (data.success) {
@@ -104,40 +104,23 @@ const LoginModal = ({ isOpen, onClose, onLogin, onSignUpClick }) => {
             </div>
           </CardContent>
 
-          <CardFooter className="flex flex-col gap-2">
-            <div className="flex gap-2 w-full">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleClose}
-                className="flex-1"
-                disabled={loading}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                className="flex-1"
-                disabled={loading}
-              >
-                {loading ? 'Signing In...' : 'Sign In'}
-              </Button>
-            </div>
-
-            <div className="text-center text-sm text-gray-600 pt-2 border-t">
-              Don't have an account?{' '}
-              <button
-                type="button"
-                onClick={() => {
-                  handleClose();
-                  onSignUpClick();
-                }}
-                className="text-primary hover:underline font-medium"
-                disabled={loading}
-              >
-                Sign Up
-              </button>
-            </div>
+          <CardFooter className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+              className="flex-1"
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="flex-1"
+              disabled={loading}
+            >
+              {loading ? 'Signing In...' : 'Sign In'}
+            </Button>
           </CardFooter>
         </form>
       </Card>

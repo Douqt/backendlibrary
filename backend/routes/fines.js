@@ -89,7 +89,7 @@ router.patch("/:fine_id", async (req, res) => {
     }
 
     // Members can only pay their own fines
-    if (user_type === 'member' && fines[0].member_id !== parseInt(user_id)) {
+    if (user_type === 'member' && fines[0].member_id !== user_id) {
       return res.status(403).json({ error: "You can only pay your own fines" });
     }
 

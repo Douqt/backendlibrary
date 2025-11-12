@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, AlertCircle, Calendar, DollarSign, BookOpen } from 'lucide-react';
-import axios from 'axios';
-import { API_URL } from '../config/api';
+import { API_BASE_URL } from '../config';
 
 const NotificationBell = ({ user, setActiveTab }) => {
   const [notifications, setNotifications] = useState([]);
@@ -17,16 +16,16 @@ const NotificationBell = ({ user, setActiveTab }) => {
 
   const fetchNotifications = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/notifications`, {
+      const response = await fetch(`${API_BASE_URL}/notifications`, {
         headers: {
           'x-user-type': user.user_type,
           'x-user-id': user.user_type === 'member' ? user.member_id : user.staff_id
-        },
-        withCredentials: true
+        }
       });
 
-      setNotifications(response.data.notifications || []);
-      setNotificationCount(response.data.count || 0);
+      const data = await response.json();
+      setNotifications(data.notifications || []);
+      setNotificationCount(data.count || 0);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching notifications:', error);

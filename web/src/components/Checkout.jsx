@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from './ui/button';
+import { API_BASE_URL } from '../config';
 import { Badge } from './ui/badge';
-import { API_URL } from '../config/api';
 
-const Checkout = ({ user, searchQuery, onClearSearch, initialCategoryFilter }) => {
-  const [availableItems, setAvailableItems] = useState([]);
+const Checkout = ({ user }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [allItems, setAllItems] = useState([]);
   const [filteredItems, setFilteredItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -14,35 +16,39 @@ const Checkout = ({ user, searchQuery, onClearSearch, initialCategoryFilter }) =
   const [totalItems, setTotalItems] = useState(0);
   const itemsPerPage = 12;
 
+  // Get search query and category from URL parameters
+  const urlSearchQuery = searchParams.get('search');
+  const urlCategory = searchParams.get('category');
+
   // Apply initial category filter if provided - exclusive selection
   useEffect(() => {
-    if (initialCategoryFilter) {
+    if (urlCategory) {
       // Map itemType to filter type
-      const filterType = initialCategoryFilter === 'electronic_rental' ? 'electronics' : initialCategoryFilter;
-      // If navigating from a category, only show that category
+      const filterType = urlCategory === 'electronic_rental' ? 'electronics' : urlCategory;
       setTypeFilters([filterType]);
     } else {
       // Default view shows all categories including articles
       setTypeFilters(['book', 'movie', 'electronics', 'article']);
     }
-  }, [initialCategoryFilter]);
+  }, [urlCategory]);
 
   useEffect(() => {
-    const fetchAvailableItems = async () => {
+    const fetchAllItems = async () => {
       try {
         setLoading(true);
+        // Fetch all items (both available and unavailable)
         const urls = [
-          `${API_URL}/api/books?available=true`,
-          `${API_URL}/api/movies?available=true`,
-          `${API_URL}/api/articles?available=true`,
-          `${API_URL}/api/electronics?available=true`
+          `${API_BASE_URL}/books`,
+          `${API_BASE_URL}/movies`,
+          `${API_BASE_URL}/articles`,
+          `${API_BASE_URL}/electronics`
         ];
 
-        if (searchQuery) {
-          urls[0] += `&search=${encodeURIComponent(searchQuery)}`;
-          urls[1] += `&search=${encodeURIComponent(searchQuery)}`;
-          urls[2] += `&search=${encodeURIComponent(searchQuery)}`;
-          urls[3] += `&search=${encodeURIComponent(searchQuery)}`;
+        if (urlSearchQuery) {
+          urls[0] += `?search=${encodeURIComponent(urlSearchQuery)}`;
+          urls[1] += `?search=${encodeURIComponent(urlSearchQuery)}`;
+          urls[2] += `?search=${encodeURIComponent(urlSearchQuery)}`;
+          urls[3] += `?search=${encodeURIComponent(urlSearchQuery)}`;
         }
 
         const promises = urls.map(url => fetch(url).then(res => res.json()));
@@ -58,10 +64,12 @@ const Checkout = ({ user, searchQuery, onClearSearch, initialCategoryFilter }) =
               title: book.title,
               type: 'book',
               itemType: 'book',
-              itemId: book.book_id,
+              itemId: `book-${book.book_id}`,
               authors: book.authors,
-              details: `ISBN: ${book.isbn} | Publisher: ${book.publisher_name}`,
-              branch: book.branch_info
+              copies: book.copies,
+              details: `Copies: ${book.copies} | ISBN: ${book.isbn} | Publisher: ${book.publisher_name}`,
+              branch: book.branch_info,
+              available: book.copies > 0
             });
           });
         }
@@ -74,10 +82,12 @@ const Checkout = ({ user, searchQuery, onClearSearch, initialCategoryFilter }) =
               title: movie.title,
               type: 'movie',
               itemType: 'movie',
-              itemId: movie.movie_id,
+              itemId: `movie-${movie.movie_id}`,
               authors: movie.director_name ? `Directed by ${movie.director_name}` : '',
-              details: `Release: ${new Date(movie.release_date).getFullYear()} | Media: ${movie.media_type}`,
-              branch: movie.branch_info
+              copies: movie.copy_amount,
+              details: `Copies: ${movie.copy_amount} | Release: ${new Date(movie.release_date).getFullYear()} | Media: ${movie.media_type}`,
+              branch: movie.branch_info,
+              available: movie.copy_amount > 0
             });
           });
         }
@@ -90,10 +100,12 @@ const Checkout = ({ user, searchQuery, onClearSearch, initialCategoryFilter }) =
               title: article.title,
               type: 'article',
               itemType: 'article',
-              itemId: article.article_id,
+              itemId: `article-${article.article_id}`,
               authors: article.authors || 'Various Authors',
-              details: `Publisher: ${article.publisher_name} | ISSN: ${article.issn}`,
-              branch: article.branch_info
+              copies: article.copies,
+              details: `Copies: ${article.copies} | ISSN: ${article.issn} | Publisher: ${article.publisher_name}`,
+              branch: article.branch_info,
+              available: article.copies > 0
             });
           });
         }
@@ -106,15 +118,17 @@ const Checkout = ({ user, searchQuery, onClearSearch, initialCategoryFilter }) =
               title: device.device_name,
               type: 'electronics',
               itemType: 'electronic_rental',
-              itemId: device.electronics_id,
+              itemId: `electronic-${device.electronics_id}`,
               authors: `Made by ${device.maker}`,
-              details: `Serial: ${device.serial_num} | Manufactured: ${new Date(device.manufact_date).toLocaleDateString()}`,
-              branch: device.branch_info
+              copies: device.copy_amount,
+              details: `Copies: ${device.copy_amount} | Serial: ${device.serial_num} | Manufactured: ${new Date(device.manufact_date).toLocaleDateString()}`,
+              branch: device.branch_info,
+              available: device.copy_amount > 0
             });
           });
         }
 
-        setAvailableItems(allItems);
+        setAllItems(allItems);
         setLoading(false);
       } catch (error) {
         console.error('Error fetching items:', error);
@@ -123,12 +137,12 @@ const Checkout = ({ user, searchQuery, onClearSearch, initialCategoryFilter }) =
       }
     };
 
-    fetchAvailableItems();
-  }, [searchQuery]);
+    fetchAllItems();
+  }, [urlSearchQuery]);
 
   // Filter items based on type filters and search, then paginate
   useEffect(() => {
-    let filtered = availableItems.filter(item =>
+    let filtered = allItems.filter(item =>
       typeFilters.includes(item.type) &&
       (localSearch === '' ||
        item.title.toLowerCase().includes(localSearch.toLowerCase()) ||
@@ -140,7 +154,7 @@ const Checkout = ({ user, searchQuery, onClearSearch, initialCategoryFilter }) =
     setCurrentPage(1); // Reset to first page when filters change
 
     setFilteredItems(filtered);
-  }, [availableItems, typeFilters, localSearch]);
+  }, [allItems, typeFilters, localSearch]);
 
   // Get current page items
   const getCurrentPageItems = () => {
@@ -172,9 +186,8 @@ const Checkout = ({ user, searchQuery, onClearSearch, initialCategoryFilter }) =
   const clearAllFilters = () => {
     setLocalSearch('');
     setTypeFilters(['book', 'movie', 'electronics', 'article']); // Include articles
-    if (onClearSearch) {
-      onClearSearch();
-    }
+    // Clear URL parameters
+    setSearchParams({});
   };
 
   const handleCheckout = async (item) => {
@@ -188,7 +201,7 @@ const Checkout = ({ user, searchQuery, onClearSearch, initialCategoryFilter }) =
         'x-user-id': userData.user_type === 'member' ? userData.member_id : userData.staff_id
       };
 
-      const response = await fetch(`${API_URL}/api/loans`, {
+      const response = await fetch(`${API_BASE_URL}/loans`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -203,13 +216,16 @@ const Checkout = ({ user, searchQuery, onClearSearch, initialCategoryFilter }) =
         const result = await response.json();
         alert(`"${item.title}" has been checked out successfully!`);
 
-        // Clear search query after successful checkout
-        if (onClearSearch) {
-          onClearSearch();
-        }
-
-        // Remove the item from the list since it's no longer available
-        setAvailableItems(prev => prev.filter(i => i.id !== item.id));
+        // Update the item copies count and availability in real-time
+        setAllItems(prev => prev.map(i => {
+          if (i.id === item.id) {
+            const newCopies = Math.max(0, i.copies - 1);
+            const newAvailable = newCopies > 0;
+            const updatedDetails = i.details.replace(/Copies: \d+/, `Copies: ${newCopies}`);
+            return { ...i, copies: newCopies, available: newAvailable, details: updatedDetails };
+          }
+          return i;
+        }));
       } else {
         const errorData = await response.json();
         alert(`Checkout failed: ${errorData.message}`);
@@ -220,12 +236,45 @@ const Checkout = ({ user, searchQuery, onClearSearch, initialCategoryFilter }) =
     }
   };
 
+  const handleHoldRequest = async (item) => {
+    try {
+      const userData = JSON.parse(localStorage.getItem('user'));
+      if (!userData) return;
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'x-user-type': userData.user_type,
+        'x-user-id': userData.user_type === 'member' ? userData.member_id : userData.staff_id
+      };
+
+      const response = await fetch(`${API_BASE_URL}/hold-requests`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          member_id: userData.member_id,
+          item_id: item.itemId
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert(`Hold request for "${item.title}" has been placed successfully! Your position in queue: ${result.data.queue_position}`);
+      } else {
+        const errorData = await response.json();
+        alert(`Hold request failed: ${errorData.message}`);
+      }
+    } catch (error) {
+      console.error('Hold request error:', error);
+      alert('Hold request failed due to network error');
+    }
+  };
+
   const getTypeColor = (type) => {
     switch (type) {
       case 'book': return 'bg-blue-100 text-blue-800';
       case 'movie': return 'bg-purple-100 text-purple-800';
-      case 'article': return 'bg-green-100 text-green-800';
-      case 'electronics': return 'bg-orange-100 text-orange-800';
+      case 'article': return 'bg-red-100 text-red-800';
+      case 'electronics': return 'bg-yellow-100 text-yellow-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -233,8 +282,8 @@ const Checkout = ({ user, searchQuery, onClearSearch, initialCategoryFilter }) =
   if (loading) return (
     <div className="py-20 px-4 w-full">
       <div className="max-w-7xl mx-auto w-full">
-        <h2 className="text-4xl font-bold mb-8 text-foreground">Checkout Available Items</h2>
-        <p className="text-muted-foreground">Loading available items...</p>
+        <h2 className="text-4xl font-bold mb-8 text-foreground">Browse Library Items</h2>
+        <p className="text-muted-foreground">Loading library items...</p>
       </div>
     </div>
   );
@@ -242,7 +291,7 @@ const Checkout = ({ user, searchQuery, onClearSearch, initialCategoryFilter }) =
   if (error) return (
     <div className="py-20 px-4 w-full">
       <div className="max-w-7xl mx-auto w-full">
-        <h2 className="text-4xl font-bold mb-8 text-foreground">Checkout Available Items</h2>
+        <h2 className="text-4xl font-bold mb-8 text-foreground">Browse Library Items</h2>
         <p className="text-red-500">Error: {error}</p>
       </div>
     </div>
@@ -252,7 +301,7 @@ const Checkout = ({ user, searchQuery, onClearSearch, initialCategoryFilter }) =
     <div className="py-20 px-4 w-full">
       <div className="max-w-7xl mx-auto w-full">
         <div className="mb-8">
-          <h2 className="text-4xl font-bold mb-4 text-foreground">Available for Checkout</h2>
+          <h2 className="text-4xl font-bold mb-4 text-foreground">Browse Library Items</h2>
 
           {/* Search and Filters */}
           <div className="flex flex-col gap-4 mb-6 p-4 bg-muted/50 rounded-lg">
@@ -293,15 +342,15 @@ const Checkout = ({ user, searchQuery, onClearSearch, initialCategoryFilter }) =
             </div>
           </div>
 
-          {searchQuery && (
-            <p className="text-muted-foreground mb-4">Global search results for: <span className="font-semibold">"{searchQuery}"</span></p>
+          {urlSearchQuery && (
+            <p className="text-muted-foreground mb-4">Global search results for: <span className="font-semibold">"{urlSearchQuery}"</span></p>
           )}
         </div>
 
         {filteredItems.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-xl text-muted-foreground mb-4">
-              {availableItems.length === 0 ? 'No items available for checkout at the moment.' : 'No items match your filters.'}
+              {allItems.length === 0 ? 'No items available at the moment.' : 'No items match your filters.'}
             </p>
             {(localSearch || typeFilters.length < 3) && (
               <Button onClick={clearAllFilters}>
@@ -311,28 +360,61 @@ const Checkout = ({ user, searchQuery, onClearSearch, initialCategoryFilter }) =
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="space-y-4">
               {getCurrentPageItems().map((item) => (
-                <div key={item.id} className="border p-6 rounded-lg bg-card hover:shadow-lg transition-shadow">
-                  <div className="flex justify-between items-start mb-3">
-                    <h3 className="text-xl font-semibold text-foreground line-clamp-2">{item.title}</h3>
-                    <Badge className={getTypeColor(item.type)}>
-                      {item.type}
-                    </Badge>
+                <div key={item.id} className={`border border-border rounded-lg p-6 hover:shadow-md transition-shadow ${
+                  item.available ? 'bg-card' : 'bg-muted/30 opacity-75'
+                }`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-2">
+                        <h3 className={`text-lg font-semibold line-clamp-2 ${
+                          item.available ? 'text-foreground' : 'text-muted-foreground'
+                        }`}>
+                          {item.title}
+                        </h3>
+                        <div className="flex gap-2">
+                          <Badge className={getTypeColor(item.type)}>
+                            {item.type}
+                          </Badge>
+                          {!item.available && (
+                            <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                              Unavailable
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+
+                      <p className="text-muted-foreground mb-2">{item.authors}</p>
+                      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-2">
+                        <span>{item.details.split(' | ')[0]}</span>
+                        <span>{item.details.split(' | ').slice(1).join(' | ')}</span>
+                      </div>
+                      <p className="text-sm text-primary">📍 {item.branch}</p>
+                    </div>
+                    {user && user.user_type === 'member' && (
+                      <div className="flex gap-2 sm:flex-col sm:gap-1">
+                        {item.available ? (
+                          <Button
+                            onClick={() => handleCheckout(item)}
+                            size="sm"
+                            className="sm:w-auto w-full"
+                          >
+                            Check Out
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={() => handleHoldRequest(item)}
+                            variant="outline"
+                            size="sm"
+                            className="sm:w-auto w-full border-orange-200 text-orange-700 hover:bg-orange-50"
+                          >
+                            Request Hold
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
-
-                  <p className="text-muted-foreground mb-2">{item.authors}</p>
-                  <p className="text-sm text-muted-foreground mb-3">{item.details}</p>
-                  <p className="text-sm text-primary mb-4">📍 {item.branch}</p>
-
-                  {user && user.user_type === 'member' && (
-                    <Button
-                      onClick={() => handleCheckout(item)}
-                      className="w-full"
-                    >
-                      Check Out
-                    </Button>
-                  )}
                 </div>
               ))}
             </div>
