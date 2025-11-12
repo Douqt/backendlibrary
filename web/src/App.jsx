@@ -9,6 +9,8 @@ import FeaturedBooks from './components/FeaturedBooks';
 import LoginModal from './components/LoginModal';
 import RegistrationModal from './components/RegistrationModal';
 import UserInfoModal from './components/UserInfoModal';
+import PaymentModal from './components/PaymentModal';
+import PaymentHistory from './components/PaymentHistory';
 import { Button } from './components/ui/button';
 import { Badge } from './components/ui/badge';
 import { API_URL } from './config/api';
@@ -19,6 +21,7 @@ function App() {
   const [loginModal, setLoginModal] = useState(false);
   const [registrationModal, setRegistrationModal] = useState(false);
   const [userInfoModal, setUserInfoModal] = useState(false);
+  const [paymentHistoryModal, setPaymentHistoryModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [initialCategoryFilter, setInitialCategoryFilter] = useState(null);
 
@@ -46,6 +49,7 @@ function App() {
     }
     setUser(null);
     localStorage.removeItem('user');
+    setActiveTab('dashboard');
   };
 
   const openLoginModal = () => {
@@ -74,6 +78,14 @@ function App() {
 
   const handleUserInfoUpdate = (updatedUser) => {
     setUser(updatedUser);
+  };
+
+  const openPaymentHistoryModal = () => {
+    setPaymentHistoryModal(true);
+  };
+
+  const closePaymentHistoryModal = () => {
+    setPaymentHistoryModal(false);
   };
 
   const scrollToCollections = () => {
@@ -107,6 +119,7 @@ function App() {
         onSignIn={openLoginModal}
         onLogout={handleLogout}
         onUpdateInfo={openUserInfoModal}
+        onPaymentHistory={openPaymentHistoryModal}
       />
       <main className="w-full">
         {activeTab === 'dashboard' && (
@@ -177,6 +190,11 @@ function App() {
         user={user}
         onUpdateSuccess={handleUserInfoUpdate}
       />
+      {paymentHistoryModal && (
+        <PaymentHistory
+          onClose={closePaymentHistoryModal}
+        />
+      )}
     </div>
   );
 }
@@ -873,8 +891,10 @@ function Fines({ user }) {
   const [fines, setFines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [selectedFine, setSelectedFine] = useState(null);
 
-  useEffect(() => {
+  const fetchFines = () => {
     const user = JSON.parse(localStorage.getItem('user'));
     const headers = {};
     if (user) {
@@ -892,6 +912,10 @@ function Fines({ user }) {
         setError(err.message);
         setLoading(false);
       });
+  };
+
+  useEffect(() => {
+    fetchFines();
   }, []);
 
   if (loading) return (
@@ -938,42 +962,9 @@ function Fines({ user }) {
                 {fine.payment_status === 'unpaid' && (
                   <Button
                     className="mt-2"
-                    onClick={async () => {
-                      const confirmPayment = window.confirm(
-                        `Pay fine of $${fine.amount}?\n\n` +
-                        `Reason: ${fine.reason}\n\n` +
-                        `Note: This is a simulated payment. Click OK to mark as paid.`
-                      );
-
-                      if (!confirmPayment) return;
-
-                      try {
-                        const user = JSON.parse(localStorage.getItem('user'));
-                        const headers = {
-                          'Content-Type': 'application/json',
-                          'x-user-type': user.user_type,
-                          'x-user-id': user.user_type === 'member' ? user.member_id : user.staff_id
-                        };
-
-                        const response = await fetch(`${API_URL}/api/fines/${fine.fine_id}`, {
-                          method: 'PATCH',
-                          headers,
-                          body: JSON.stringify({ payment_status: 'paid' })
-                        });
-
-                        if (response.ok) {
-                          alert(`Payment of $${fine.amount} processed successfully!`);
-                          // Remove the paid fine from the list
-                          setFines(prevFines => prevFines.filter(f => f.fine_id !== fine.fine_id));
-                        } else {
-                          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-                          console.error('Payment failed:', response.status, errorData);
-                          alert(`Failed to process payment: ${errorData.error || errorData.message || 'Please try again.'}`);
-                        }
-                      } catch (error) {
-                        console.error('Error paying fine:', error);
-                        alert(`Error processing payment: ${error.message}. Please check console for details.`);
-                      }
+                    onClick={() => {
+                      setSelectedFine(fine);
+                      setPaymentModalOpen(true);
                     }}
                   >
                     Pay Fine
@@ -983,6 +974,20 @@ function Fines({ user }) {
             ))
           )}
         </div>
+
+        {/* Payment Modal */}
+        {paymentModalOpen && selectedFine && (
+          <PaymentModal
+            fine={selectedFine}
+            onClose={() => {
+              setPaymentModalOpen(false);
+              setSelectedFine(null);
+            }}
+            onSuccess={() => {
+              fetchFines(); // Refresh the fines list
+            }}
+          />
+        )}
       </div>
     </div>
   );

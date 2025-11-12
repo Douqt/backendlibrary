@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Button } from './ui/button';
-import { Library, Menu, User, LogOut, Settings, ChevronDown } from 'lucide-react';
+import { Library, Menu, User, LogOut, Settings, ChevronDown, Receipt } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 
-const Header = ({ activeTab, setActiveTab, user, onSignIn, onLogout, onUpdateInfo }) => {
+const Header = ({ activeTab, setActiveTab, user, onSignIn, onLogout, onUpdateInfo, onPaymentHistory }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -65,6 +66,9 @@ const Header = ({ activeTab, setActiveTab, user, onSignIn, onLogout, onUpdateInf
           </Button>
           {user ? (
             <div className="flex items-center gap-3">
+              {/* Notification Bell */}
+              <NotificationBell user={user} setActiveTab={setActiveTab} />
+
               {/* User Menu Dropdown */}
               {user.user_type === 'member' && (
                 <div className="relative">
@@ -95,10 +99,20 @@ const Header = ({ activeTab, setActiveTab, user, onSignIn, onLogout, onUpdateInf
                             setShowUserMenu(false);
                             onUpdateInfo();
                           }}
-                          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 transition-colors"
+                          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 transition-colors border-b border-gray-100"
                         >
                           <Settings className="h-4 w-4" />
                           Update Info
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowUserMenu(false);
+                            onPaymentHistory();
+                          }}
+                          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 transition-colors"
+                        >
+                          <Receipt className="h-4 w-4" />
+                          Payment History
                         </button>
                       </div>
                     </>

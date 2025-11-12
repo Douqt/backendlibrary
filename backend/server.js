@@ -13,7 +13,10 @@ const app = express();
 // ===========================
 // MIDDLEWARE (runs on every request)
 // ===========================
-app.use(cors()); // Allow requests from React app
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  credentials: true
+})); // Allow requests from React app
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({extended:true})); // Parse form data
 
@@ -44,6 +47,8 @@ app.use('/api/loans', require('./routes/loans'));
 app.use('/api/members', require('./routes/members'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/fines', require('./routes/fines'));
+app.use('/api/payments', require('./routes/payments'));
+app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/branches', require('./routes/branches'));
 app.use('/api/staff', require('./routes/staff'));
 

@@ -30,6 +30,10 @@ const LoginModal = ({ isOpen, onClose, onLogin, onSignUpClick }) => {
 
       if (data.success) {
         onLogin(data.data);
+        // Clear credentials after successful login
+        setUsername('');
+        setPassword('');
+        setError('');
       } else {
         setError(data.message || 'Login failed');
       }
