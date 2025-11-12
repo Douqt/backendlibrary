@@ -250,10 +250,11 @@ router.delete('/:id', asyncHandler(async (req, res) => {
     );
 
     // Update auth record to prevent login
-    await db.query(
-        'UPDATE staff_auth SET role = "inactive" WHERE staff_id = ?',
-        [id]
-    );
+   await db.query(
+  'UPDATE staff_auth SET role = "staff" WHERE staff_id = ?',
+  [id]
+);
+
 
     res.status(200).json({
         success: true,
