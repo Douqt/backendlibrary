@@ -756,6 +756,86 @@ SELECT
 
 FROM vw_member_account_summary AS s;
 
+--######################################
+-- Bi weekly loan counts per member
+--######################################
+CREATE OR REPLACE VIEW vw_admin_biweekly_loans AS
+SELECT
+    m.member_id,
+    m.member_name,
+    -- Two-week bucket index within the year
+    CONCAT(
+        YEAR(l.loan_date),
+        '-B',
+        LPAD(FLOOR((DAYOFYEAR(l.loan_date) - 1) / 14) + 1, 2, '0')
+    ) AS biweek_label,
+    MIN(l.loan_date) AS period_start,
+    MAX(l.loan_date) AS period_end,
+    COUNT(*) AS loans_in_period
+FROM loan l
+JOIN member m      ON m.member_id = l.member_id
+JOIN books  b      ON b.book_id   = l.item_id       -- 3rd table join (item)
+WHERE l.loan_date IS NOT NULL
+GROUP BY
+    m.member_id,
+    m.member_name,
+    YEAR(l.loan_date),
+    FLOOR((DAYOFYEAR(l.loan_date) - 1) / 14)
+ORDER BY period_start;
+
+CREATE OR REPLACE VIEW vw_member_summary AS
+SELECT
+    x.member_id,
+    x.member_name,
+    x.member_type,
+    x.status        AS member_status,
+    x.total_loans,
+    x.curr_loans,
+    x.total_fines_accrued,
+    x.unpaid_fine_count,
+    x.max_loans,
+    CASE
+        WHEN x.unpaid_fine_count > 0 OR x.curr_loans >= x.max_loans
+            THEN 1
+        ELSE 0
+    END AS is_restricted
+FROM (
+    SELECT
+        m.member_id,
+        m.member_name,
+        m.member_type,
+        m.status,
+        COUNT(DISTINCT l.loan_id) AS total_loans,
+        SUM(CASE WHEN l.return_ts IS NULL THEN 1 ELSE 0 END) AS curr_loans,
+        COALESCE(SUM(f.amount), 0) AS total_fines_accrued,
+        SUM(CASE WHEN f.payment_status <> 'paid' THEN 1 ELSE 0 END) AS unpaid_fine_count,
+        CASE
+            WHEN m.member_type = 'student' THEN 5
+            WHEN m.member_type = 'faculty' THEN 10
+            ELSE 3
+        END AS max_loans
+    FROM member m
+    LEFT JOIN loan  l ON l.member_id = m.member_id
+    LEFT JOIN books b ON b.book_id   = l.item_id        -- item join again
+    LEFT JOIN fines f ON f.member_id = m.member_id
+    GROUP BY
+        m.member_id, m.member_name, m.member_type, m.status
+) AS x;
+
+SELECT *
+FROM vw_admin_member_summary
+ORDER BY total_loans DESC, member_name;
+
+SELECT *
+FROM vw_admin_member_summary
+ORDER BY total_fines_accrued DESC, member_name;
+
+SELECT *
+FROM vw_admin_member_summary
+WHERE is_restricted = 1
+ORDER BY member_name DESC;
+
+
 --zold
 DROP PROCEDURE IF EXISTS admin_delete_item_copy$$
 CREATE PROCEDURE admin_delete_item_copy(IN p_copy_id INT)
