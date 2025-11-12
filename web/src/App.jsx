@@ -320,9 +320,40 @@ function StaffManagement({ user }) {
                     variant="destructive"
                     size="sm"
                     disabled={member.staff_id === user.staff_id} // Can't delete yourself
-                  >
-                    Remove
-                  </Button>
+                   onClick={async () => {
+                    if (!window.confirm(`Are you sure you want to remove ${member.name}?`)) return;
+
+                  try {
+                  const userData = JSON.parse(localStorage.getItem('user'));
+                  const headers = {
+                          'Content-Type': 'application/json',
+                        'x-user-type': userData.user_type,
+                        'x-user-id': userData.staff_id
+                      };
+
+              const response = await fetch(`https://librarydb.duckdns.org/api/staff/${member.staff_id}`, {
+                  method: 'DELETE',
+                  headers
+                          });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || 'Failed to remove staff member');
+        return;
+      }
+
+      alert(`Removed ${member.name} successfully`);
+      window.location.reload(); // Refresh staff list
+    } catch (error) {
+      console.error('Error removing staff:', error);
+      alert('An error occurred while removing the staff member');
+    }
+  }}
+>
+  Remove
+</Button>
+
                 </div>
               </div>
             ))
