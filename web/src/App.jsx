@@ -317,44 +317,36 @@ function StaffManagement({ user }) {
                     Edit
                   </Button>
                   <Button
-                    variant="destructive"
-                    size="sm"
-                    disabled={member.staff_id === user.staff_id} // Can't delete yourself
-                   onClick={async () => {
-                    if (!window.confirm(`Are you sure you want to remove ${member.name}?`)) return;
+  variant="destructive"
+  size="sm"
+  disabled={member.staff_id === user.staff_id} // Can't delete yourself
+  onClick={async () => {
+    if (!window.confirm(`Are you sure you want to remove ${member.name}?`)) return;
 
-                  try {
-                  const userData = JSON.parse(localStorage.getItem('user'));
-                  const headers = {
-                          'Content-Type': 'application/json',
-                        'x-user-type': userData.user_type,
-                        'x-user-id': userData.staff_id
-                      };
+    try {
+      // Soft-delete the staff
+      await db.query(
+        `UPDATE staff 
+         SET employment_status = 'Terminated',
+             terminated_at = NOW(),
+             termination_cause = 'Removed'
+         WHERE staff_id = ?`,
+        [member.staff_id]
+      );
 
-              const response = await fetch(`https://librarydb.duckdns.org/api/staff/${member.staff_id}`, {
-                  method: 'DELETE',
-                  headers
-                          });
+      // Optionally, remove the staff from your local UI state immediately
+      setStaffList(prev => prev.filter(s => s.staff_id !== member.staff_id));
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        alert(data.message || 'Failed to remove staff member');
-        return;
-      }
-
-      alert(`Removed ${member.name} successfully`);
-      window.location.reload(); // Refresh staff list
-    } catch (error) {
-      console.error('Error removing staff:', error);
-      alert('An error occurred while removing the staff member');
+      alert(`${member.name} has been removed.`);
+    } catch (err) {
+      console.error(err);
+      alert('Error removing staff.');
     }
   }}
 >
   Remove
 </Button>
-
-                </div>
+                 </div>
               </div>
             ))
           )}
