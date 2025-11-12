@@ -84,5 +84,60 @@ router.get(
     });
   })
 );
+/*
+GET /api/admin/report/summary
+Admin-only: Returns bi-weekly loan counts + member summaries
+*/
+router.get(
+  '/summary',
+  asyncHandler(async (req, res) => {
+
+    // 1) Bi-weekly loan counts (for bar graph)
+    const [biweekly] = await db.query(`
+      SELECT
+        member_id,
+        member_name,
+        biweek_label,
+        period_start,
+        period_end,
+        loans_in_period
+      FROM vw_admin_biweekly_loans
+      ORDER BY period_start, member_name
+    `);
+
+    // 2) Members sorted by total loans (desc)
+    const [loanLeaders] = await db.query(`
+      SELECT *
+      FROM vw_member_summary
+      ORDER BY total_loans DESC, member_name
+    `);
+
+    // 3) Members sorted by fines accrued (desc)
+    const [fineLeaders] = await db.query(`
+      SELECT *
+      FROM vw_member_summary
+      ORDER BY total_fines_accrued DESC, member_name
+    `);
+
+    // 4) Members restricted from borrowing
+    const [restrictedMembers] = await db.query(`
+      SELECT *
+      FROM vw_member_summary
+      WHERE is_restricted = 1
+      ORDER BY member_name DESC
+    `);
+
+    res.status(200).json({
+      success: true,
+      message: 'Admin summary report generated',
+      data: {
+        biweekly,
+        loanLeaders,
+        fineLeaders,
+        restrictedMembers,
+      },
+    });
+  })
+);
 
 module.exports = router;
