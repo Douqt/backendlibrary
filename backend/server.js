@@ -6,7 +6,6 @@ require('dotenv').config(); // Load environment variables from .env
 // Import our files
 const db = require('./config/db'); // Database connection
 const errorHandler = require('./middleware/errorHandler');
-const adminReport_summary = require('./routes/admin_report'); //DONT KNOW IF THIS SHOULD BE HERE????
 
 
 // Create Express app
@@ -46,7 +45,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/fines', require('./routes/fines'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/notifications', require('./routes/notifications'));
-app.use('/api/admin-report', require('./routes/admin_report'));
+app.use('/api/admin/report', require('./routes/admin_report'));
 app.use('/api/branches', require('./routes/branches'));
 app.use('/api/staff', require('./routes/staff'));
 app.use('/api/hold-requests', require('./routes/hold_requests'));
