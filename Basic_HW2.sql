@@ -764,8 +764,154 @@ END$$
 -- STORED PROCEDURES & VIEWS 
 -- ===============================
 
--- Views removed for compatibility - can be added manually if needed
+CREATE OR REPLACE VIEW vw_member_account_summary AS
+SELECT 
+    m.member_id,
+    m.member_name,
+    m.member_email,
+    m.member_type,
+    m.status AS member_status,
 
+    -- current active loans (not returned)
+    (
+      SELECT COUNT(*)
+      FROM loan l
+      WHERE l.member_id = m.member_id
+        AND l.return_ts IS NULL
+    ) AS active_loans_count,
+
+    -- total loans ever
+    (
+      SELECT COUNT(*)
+      FROM loan l
+      WHERE l.member_id = m.member_id
+    ) AS total_loans_count,
+
+    -- number of fines
+    (
+      SELECT COUNT(*)
+      FROM fines f
+      WHERE f.member_id = m.member_id
+    ) AS total_fines_count,
+
+    -- total fines charged
+    (
+      SELECT COALESCE(SUM(f.amount), 0)
+      FROM fines f
+      WHERE f.member_id = m.member_id
+    ) AS total_fines_amount,
+
+    -- total fines paid
+    (
+      SELECT COALESCE(SUM(p.paid_amount), 0)
+      FROM fines f
+      JOIN payments p ON p.fine_id = f.fine_id
+      WHERE f.member_id = m.member_id
+    ) AS total_fines_paid,
+
+    -- remaining balance
+    (
+      (SELECT COALESCE(SUM(f.amount), 0)
+       FROM fines f
+       WHERE f.member_id = m.member_id)
+      -
+      (SELECT COALESCE(SUM(p.paid_amount), 0)
+       FROM fines f
+       JOIN payments p ON p.fine_id = f.fine_id
+       WHERE f.member_id = m.member_id)
+    ) AS total_fines_balance
+
+FROM member m;
+
+CREATE OR REPLACE VIEW vw_staff_member_report AS
+SELECT
+    s.member_id,
+    s.member_name,
+    s.member_email,
+    s.member_type,
+    s.member_status,
+    s.active_loans_count    AS current_loaned_items,
+    s.total_loans_count     AS total_loans,
+    s.total_fines_count     AS total_fines,
+    s.total_fines_amount    AS fines_accrued,
+    s.total_fines_paid      AS paid_fines_value,
+    s.total_fines_balance   AS outstanding_fines_balance
+FROM vw_member_account_summary AS s;
+
+CREATE OR REPLACE VIEW vw_admin_biweekly_loans AS
+SELECT
+    m.member_id,
+    m.member_name,
+    CONCAT(
+        YEAR(l.loan_date),
+        '-B',
+        LPAD(FLOOR((DAYOFYEAR(l.loan_date) - 1) / 14) + 1, 2, '0')
+    ) AS biweek_label,
+    MIN(l.loan_date) AS period_start,
+    MAX(l.loan_date) AS period_end,
+    COUNT(*) AS loans_in_period
+FROM loan l
+JOIN member m ON m.member_id = l.member_id
+JOIN books  b ON b.book_id   = l.item_id   -- 3rd table join
+WHERE l.loan_date IS NOT NULL
+  AND l.item_type = 'book'
+GROUP BY
+    m.member_id,
+    m.member_name,
+    YEAR(l.loan_date),
+    FLOOR((DAYOFYEAR(l.loan_date) - 1) / 14)
+ORDER BY period_start;
+
+CREATE OR REPLACE VIEW vw_member_summary AS
+WITH fine_totals AS (
+    SELECT 
+        f.fine_id,
+        f.member_id,
+        f.amount,
+        COALESCE(SUM(p.paid_amount), 0) AS paid_total
+    FROM fines f
+    LEFT JOIN payments p ON p.fine_id = f.fine_id
+    GROUP BY f.fine_id, f.member_id, f.amount
+)
+SELECT
+    x.member_id,
+    x.member_name,
+    x.member_type,
+    x.status        AS member_status,
+    x.total_loans,
+    x.curr_loans,
+    x.total_fines_accrued,
+    x.unpaid_fine_count,
+    x.max_loans,
+    CASE
+        WHEN x.unpaid_fine_count > 0 OR x.curr_loans >= x.max_loans
+            THEN 1
+        ELSE 0
+    END AS is_restricted
+FROM (
+    SELECT
+        m.member_id,
+        m.member_name,
+        m.member_type,
+        m.status,
+        COUNT(DISTINCT l.loan_id) AS total_loans,
+        SUM(CASE WHEN l.return_ts IS NULL THEN 1 ELSE 0 END) AS curr_loans,
+        COALESCE(SUM(f.amount), 0) AS total_fines_accrued,
+        SUM(CASE WHEN ft.paid_total < ft.amount THEN 1 ELSE 0 END) AS unpaid_fine_count,
+        CASE
+            WHEN m.member_type = 'student' THEN 5
+            WHEN m.member_type = 'faculty' THEN 10
+            ELSE 3
+        END AS max_loans
+    FROM member m
+    LEFT JOIN loan  l  ON l.member_id = m.member_id
+    LEFT JOIN books b  ON b.book_id   = l.item_id
+    LEFT JOIN fines f  ON f.member_id = m.member_id
+    LEFT JOIN fine_totals ft ON ft.fine_id = f.fine_id
+    GROUP BY
+        m.member_id, m.member_name, m.member_type, m.status
+) AS x;
+    
 DROP PROCEDURE IF EXISTS admin_delete_item_copy$$
 CREATE PROCEDURE admin_delete_item_copy(IN p_copy_id INT)
 BEGIN
