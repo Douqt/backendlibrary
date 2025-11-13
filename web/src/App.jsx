@@ -157,11 +157,11 @@ function App() {
               )
             } />
             <Route path="/reports" element={
-              user?.user_type === 'staff' ? <AdminSUMM_Report /> : (
+              user?.user_type === 'staff' && (user.role === 'admin' || user.position === 'admin') ? <AdminSUMM_Report /> : (
                 <div className="py-20 px-4 w-full">
                   <div className="max-w-7xl mx-auto w-full text-center">
                     <h2 className="text-4xl font-bold mb-8 text-foreground">Access Denied</h2>
-                    <p className="text-muted-foreground mb-4">You need to be logged in as staff to view reports.</p>
+                    <p className="text-muted-foreground mb-4">You need to be logged in as an admin to view reports.</p>
                     <Button onClick={openLoginModal}>Sign In</Button>
                   </div>
                 </div>
