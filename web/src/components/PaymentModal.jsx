@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, CreditCard, Loader2, CheckCircle2 } from 'lucide-react';
 
-const PaymentModal = ({ fine, onClose, onSuccess }) => {
+const PaymentModal = ({ fine, onClose, onSuccess, notificationRef }) => {
   const [step, setStep] = useState(1); // 1: Form, 2: Processing, 3: Confirmation
   const [formData, setFormData] = useState({
     cardNumber: '',
@@ -130,6 +130,11 @@ const PaymentModal = ({ fine, onClose, onSuccess }) => {
       if (data.success) {
         setPaymentDetails(data.payment);
         setStep(3); // Move to confirmation step
+
+        // Refresh notifications immediately
+        if (notificationRef?.current?.refresh) {
+          notificationRef.current.refresh();
+        }
       }
     } catch (error) {
       console.error('Payment error:', error);

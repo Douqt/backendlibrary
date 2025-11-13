@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Bell, AlertCircle, Calendar, DollarSign, BookOpen } from 'lucide-react';
+import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { Bell, AlertCircle, Calendar, DollarSign, BookOpen, UserCheck } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
-const NotificationBell = ({ user, setActiveTab }) => {
+const NotificationBell = forwardRef(({ user, setActiveTab }, ref) => {
   const [notifications, setNotifications] = useState([]);
   const [notificationCount, setNotificationCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -33,21 +33,54 @@ const NotificationBell = ({ user, setActiveTab }) => {
     }
   };
 
+  // Expose fetchNotifications to parent components via ref
+  useImperativeHandle(ref, () => ({
+    refresh: fetchNotifications
+  }));
+
   const getNotificationIcon = (type) => {
     switch (type) {
       case 'due_today':
       case 'due_soon':
+      case 'loan_confirmation':
+      case 'loan_almost_due':
+      case 'loan_due':
+      case 'loan_overdue':
         return <Calendar className="h-4 w-4 text-gray-600" />;
       case 'unpaid_fine':
+      case 'fine_paid':
         return <DollarSign className="h-4 w-4 text-gray-600" />;
       case 'loan_limit':
         return <BookOpen className="h-4 w-4 text-gray-600" />;
+      case 'account_approved':
+        return <UserCheck className="h-4 w-4 text-gray-600" />;
       default:
         return <AlertCircle className="h-4 w-4 text-gray-600" />;
     }
   };
 
-  const handleNotificationClick = (notification) => {
+  const handleNotificationClick = async (notification) => {
+    // Mark notification as read if it has an ID (persistent notification)
+    if (notification.notification_id) {
+      try {
+        await fetch(`${API_BASE_URL}/notifications/${notification.notification_id}/read`, {
+          method: 'POST',
+          headers: {
+            'x-user-type': user.user_type,
+            'x-user-id': user.user_type === 'member' ? user.member_id : user.staff_id
+          }
+        });
+
+        // Update local state to reflect read status
+        setNotifications(prev =>
+          prev.filter(n => n.notification_id !== notification.notification_id)
+        );
+        setNotificationCount(prev => Math.max(0, prev - 1));
+      } catch (error) {
+        console.error('Error marking notification as read:', error);
+      }
+    }
+
     setActiveTab(notification.link);
     setShowNotifications(false);
   };
@@ -60,7 +93,13 @@ const NotificationBell = ({ user, setActiveTab }) => {
   return (
     <div className="relative">
       <button
-        onClick={() => setShowNotifications(!showNotifications)}
+        onClick={() => {
+          setShowNotifications(!showNotifications);
+          // Refresh notifications when opening the dropdown
+          if (!showNotifications) {
+            fetchNotifications();
+          }
+        }}
         className="relative p-2 hover:bg-gray-100 rounded-full transition-colors"
         aria-label="Notifications"
       >
@@ -100,7 +139,7 @@ const NotificationBell = ({ user, setActiveTab }) => {
                 <div className="divide-y divide-gray-100">
                   {notifications.map((notification, index) => (
                     <button
-                      key={index}
+                      key={notification.notification_id || index}
                       onClick={() => handleNotificationClick(notification)}
                       className="w-full p-4 hover:bg-gray-50 transition-colors text-left flex items-start gap-3"
                     >
@@ -111,6 +150,16 @@ const NotificationBell = ({ user, setActiveTab }) => {
                         <p className="text-sm text-gray-900">
                           {notification.message}
                         </p>
+                        {notification.created_at && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {new Date(notification.created_at).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        )}
                       </div>
                     </button>
                   ))}
@@ -122,6 +171,8 @@ const NotificationBell = ({ user, setActiveTab }) => {
       )}
     </div>
   );
-};
+});
+
+NotificationBell.displayName = 'NotificationBell';
 
 export default NotificationBell;

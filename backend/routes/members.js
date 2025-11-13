@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const asyncHandler = require('../middleware/asyncHandler');
+const { createNotification } = require('../services/notificationService');
 
 //GET /api/members - get all members
 router.get('/', asyncHandler(async(req, res) => {
@@ -126,9 +127,9 @@ router.put('/:id', asyncHandler(async(req, res) => {
         });
     }
 
-    //check if member exists
+    //check if member exists and get current status
     const [existingMember] = await db.query(
-        'SELECT member_id FROM member WHERE member_id = ? AND close_date = "9999-01-01"',
+        'SELECT member_id, status FROM member WHERE member_id = ? AND close_date = "9999-01-01"',
         [id]
     )
 
@@ -139,12 +140,34 @@ router.put('/:id', asyncHandler(async(req, res) => {
         })
     }
 
+    const oldStatus = existingMember[0].status;
+    const newStatus = status || 'Active';
+
     //update member
     await db.query(`
         UPDATE member
         SET member_name = ?, member_email = ?, member_type = ?, status = ?
         WHERE member_id = ? AND close_date = '9999-01-01'
-    `, [member_name, member_email, member_type, status || 'Active', id]);
+    `, [member_name, member_email, member_type, newStatus, id]);
+
+    // Send account approval notification if status changed from Pending to Active
+    if (oldStatus === 'Pending' && newStatus === 'Active') {
+        try {
+            await createNotification({
+                memberId: id,
+                notificationType: 'account_approved',
+                data: {
+                    memberName: member_name,
+                    memberType: member_type,
+                    approvalDate: new Date().toISOString().split('T')[0]
+                },
+                sendEmail: true
+            });
+        } catch (notificationError) {
+            // Log error but don't fail the member update
+            console.error('Failed to send account approval notification:', notificationError);
+        }
+    }
 
     res.json({
         success: true,
@@ -154,7 +177,7 @@ router.put('/:id', asyncHandler(async(req, res) => {
             member_name,
             member_email,
             member_type,
-            status: status || 'Active'
+            status: newStatus
         }
     });
 }));

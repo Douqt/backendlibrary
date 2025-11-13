@@ -1,186 +1,274 @@
 const db = require('../config/db');
+const { sendEmail } = require('./emailService');
 
-// In-memory notification storage (since no DB changes allowed)
-let notifications = []; // Array of notification objects
+/**
+ * Notification message templates for in-app display
+ */
+const notificationMessages = {
+  loan_confirmation: (data) => `Your loan for "${data.itemTitle}" has been confirmed. Due date: ${data.dueDate}`,
+  loan_almost_due: (data) => `Reminder: "${data.itemTitle}" is due in ${data.daysUntilDue} days (${data.dueDate})`,
+  loan_due: (data) => `Your loan "${data.itemTitle}" is due today. Please return it to avoid late fees.`,
+  loan_overdue: (data) => `OVERDUE: "${data.itemTitle}" is ${data.daysOverdue} days overdue. Current fine: $${data.currentFine}`,
+  fine_paid: (data) => `Payment of $${data.amount} received. Thank you for your payment!`,
+  account_approved: (data) => `Welcome to the library! Your account has been approved. You can now start borrowing items.`
+};
 
-class NotificationService {
-  constructor() {
-    this.notifications = [];
-  }
+/**
+ * Create and send a notification (both in-app and email)
+ * @param {Object} options - Notification options
+ * @param {number} options.memberId - Member ID to notify
+ * @param {string} options.notificationType - Type of notification
+ * @param {Object} options.data - Data for template population
+ * @param {number} options.relatedLoanId - Optional loan ID
+ * @param {number} options.relatedFineId - Optional fine ID
+ * @param {boolean} options.sendEmail - Whether to send email (default: true)
+ * @returns {Promise<Object>} - Created notification with email status
+ */
+async function createNotification({
+  memberId,
+  notificationType,
+  data,
+  relatedLoanId = null,
+  relatedFineId = null,
+  sendEmail: shouldSendEmail = true
+}) {
+  const connection = await db.getConnection();
 
-  // Generate overdue notifications
-  async generateOverdueNotifications() {
-    const today = new Date().toISOString().split('T')[0];
+  try {
+    await connection.beginTransaction();
 
-    const [overdueLoans] = await db.query(
-      `SELECT l.loan_id, l.member_id, l.item_id, l.item_type, l.due_date,
-              m.member_name, m.member_email,
-              DATEDIFF(?, l.due_date) as days_overdue,
-              COALESCE(b.title, mov.title, a.title, e.device_name) AS item_title
-       FROM loan l
-       JOIN member m ON l.member_id = m.member_id
-       LEFT JOIN books b ON l.item_type = 'book' AND l.item_id = b.book_id
-       LEFT JOIN movies mov ON l.item_type = 'movie' AND l.item_id = mov.movie_id
-       LEFT JOIN articles a ON l.item_type = 'article' AND l.item_id = a.artic_id
-       LEFT JOIN electronics e ON l.item_type = 'electronic_rental' AND l.item_id = e.libra_id
-       WHERE l.return_ts IS NULL AND l.due_date < ?`,
-      [today, today]
+    // Generate notification message
+    const messageTemplate = notificationMessages[notificationType];
+    if (!messageTemplate) {
+      throw new Error(`Unknown notification type: ${notificationType}`);
+    }
+    const message = messageTemplate(data);
+
+    // Insert notification into database
+    const [notificationResult] = await connection.query(
+      `INSERT INTO notifications
+       (member_id, notification_type, message, related_loan_id, related_fine_id)
+       VALUES (?, ?, ?, ?, ?)`,
+      [memberId, notificationType, message, relatedLoanId, relatedFineId]
     );
 
-    const newNotifications = [];
+    const notificationId = notificationResult.insertId;
 
-    for (const loan of overdueLoans) {
-      const notificationId = `overdue_${loan.loan_id}_${Date.now()}`;
-      const notification = {
-        id: notificationId,
-        type: 'overdue',
-        member_id: loan.member_id,
-        member_name: loan.member_name,
-        member_email: loan.member_email,
-        item_title: loan.item_title,
-        loan_id: loan.loan_id,
-        days_overdue: loan.days_overdue,
-        message: `Your loan for "${loan.item_title}" is ${loan.days_overdue} days overdue. Please return it or contact the library.`,
-        created_at: new Date().toISOString(),
-        sent: false
-      };
-
-      // Check if notification already exists
-      const exists = this.notifications.some(n =>
-        n.type === 'overdue' && n.loan_id === loan.loan_id && !n.sent
+    // Get member email if we need to send email
+    let emailResult = { success: false, skipped: true };
+    if (shouldSendEmail) {
+      const [members] = await connection.query(
+        'SELECT member_email, member_name FROM member WHERE member_id = ?',
+        [memberId]
       );
 
-      if (!exists) {
-        this.notifications.push(notification);
-        newNotifications.push(notification);
+      if (members.length > 0 && members[0].member_email) {
+        const memberEmail = members[0].member_email;
+        const memberName = members[0].member_name;
+
+        // Add member name to data if not present
+        if (!data.memberName) {
+          data.memberName = memberName;
+        }
+
+        // Send email asynchronously
+        emailResult = await sendEmail(memberEmail, notificationType, data);
+
+        // Log email attempt
+        await connection.query(
+          `INSERT INTO notification_logs
+           (notification_id, email_to, email_subject, email_body, status, error_message, attempt_count, sent_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            notificationId,
+            memberEmail,
+            `${notificationType.replace(/_/g, ' ').toUpperCase()}`,
+            JSON.stringify(data),
+            emailResult.success ? 'sent' : 'failed',
+            emailResult.error || null,
+            1,
+            emailResult.success ? new Date() : null
+          ]
+        );
+
+        // Update notification with email sent status
+        if (emailResult.success) {
+          await connection.query(
+            'UPDATE notifications SET sent_via_email = TRUE, email_sent_at = NOW() WHERE notification_id = ?',
+            [notificationId]
+          );
+        }
+      } else {
+        console.warn(`No email found for member ${memberId}`);
+        emailResult = { success: false, error: 'No email address on file' };
       }
     }
 
-    return newNotifications;
-  }
+    await connection.commit();
 
-  // Generate hold available notifications
-  async generateHoldAvailableNotifications() {
-    const [fulfilledRequests] = await db.query(
-      `SELECT hr.request_id, hr.member_id, hr.item_id,
-              m.member_name, m.member_email,
-              COALESCE(b.title, mov.title, a.title, e.device_name) AS item_title
-       FROM hold_requests hr
-       JOIN member m ON hr.member_id = m.member_id
-       LEFT JOIN books b ON hr.item_id = b.book_id
-       LEFT JOIN movies mov ON hr.item_id = mov.movie_id
-       LEFT JOIN articles a ON hr.item_id = a.artic_id
-       LEFT JOIN electronics e ON hr.item_id = e.libra_id
-       WHERE hr.status = 'fulfilled'`,
-      []
-    );
+    console.log(`Notification created: ${notificationType} for member ${memberId}`);
 
-    const newNotifications = [];
+    return {
+      success: true,
+      notificationId,
+      message,
+      emailSent: emailResult.success,
+      emailError: emailResult.error || null
+    };
 
-    for (const request of fulfilledRequests) {
-      // Check if notification already exists (in-memory tracking)
-      const exists = this.notifications.some(n =>
-        n.type === 'hold_available' && n.request_id === request.request_id && !n.sent
-      );
-
-      if (!exists) {
-        const notificationId = `hold_available_${request.request_id}_${Date.now()}`;
-        const notification = {
-          id: notificationId,
-          type: 'hold_available',
-          member_id: request.member_id,
-          member_name: request.member_name,
-          member_email: request.member_email,
-          item_title: request.item_title,
-          request_id: request.request_id,
-          message: `Your hold request for "${request.item_title}" is now available for pickup.`,
-          created_at: new Date().toISOString(),
-          sent: false
-        };
-
-        this.notifications.push(notification);
-        newNotifications.push(notification);
-      }
-    }
-
-    return newNotifications;
-  }
-
-  // Generate inactive account notifications
-  async generateInactiveAccountNotifications() {
-    const ninetyDaysAgo = new Date();
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-    const cutoffDate = ninetyDaysAgo.toISOString().split('T')[0];
-
-    const [inactiveMembers] = await db.query(
-      `SELECT member_id, member_name, member_email, date_last_checked_out
-       FROM member
-       WHERE close_date = '9999-01-01' AND
-             (date_last_checked_out IS NULL OR date_last_checked_out < ?)`,
-      [cutoffDate]
-    );
-
-    const newNotifications = [];
-
-    for (const member of inactiveMembers) {
-      const notificationId = `inactive_${member.member_id}_${Date.now()}`;
-      const notification = {
-        id: notificationId,
-        type: 'inactive_account',
-        member_id: member.member_id,
-        member_name: member.member_name,
-        member_email: member.member_email,
-        message: `Your account has been inactive for an extended period. Please check for any outstanding loans or fines.`,
-        created_at: new Date().toISOString(),
-        sent: false
-      };
-
-      // Check if notification already sent recently
-      const exists = this.notifications.some(n =>
-        n.type === 'inactive_account' && n.member_id === member.member_id &&
-        new Date(n.created_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Within last 30 days
-      );
-
-      if (!exists) {
-        this.notifications.push(notification);
-        newNotifications.push(notification);
-      }
-    }
-
-    return newNotifications;
-  }
-
-  // Get notifications for a member
-  getNotificationsForMember(memberId, type = null) {
-    return this.notifications.filter(n => {
-      if (n.member_id !== memberId) return false;
-      if (type && n.type !== type) return false;
-      return true;
-    });
-  }
-
-  // Mark notification as sent
-  markAsSent(notificationId) {
-    const notification = this.notifications.find(n => n.id === notificationId);
-    if (notification) {
-      notification.sent = true;
-    }
-  }
-
-  // Get all unsent notifications
-  getUnsentNotifications() {
-    return this.notifications.filter(n => !n.sent);
-  }
-
-  // Simulate sending notifications (in real app, this would send emails)
-  async sendNotifications() {
-    const unsent = this.getUnsentNotifications();
-    for (const notification of unsent) {
-      console.log(`Sending ${notification.type} notification to ${notification.member_email}: ${notification.message}`);
-      this.markAsSent(notification.id);
-    }
-    return unsent.length;
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error creating notification:', error);
+    throw error;
+  } finally {
+    connection.release();
   }
 }
 
-module.exports = new NotificationService();
+/**
+ * Mark notification as read
+ * @param {number} notificationId - Notification ID
+ * @param {number} memberId - Member ID (for security check)
+ * @returns {Promise<boolean>} - Success status
+ */
+async function markAsRead(notificationId, memberId) {
+  try {
+    const [result] = await db.query(
+      'UPDATE notifications SET is_read = TRUE WHERE notification_id = ? AND member_id = ?',
+      [notificationId, memberId]
+    );
+
+    return result.affectedRows > 0;
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get unread notifications for a member
+ * @param {number} memberId - Member ID
+ * @param {number} limit - Maximum number of notifications to return
+ * @returns {Promise<Array>} - Array of notifications
+ */
+async function getUnreadNotifications(memberId, limit = 50) {
+  try {
+    const [notifications] = await db.query(
+      `SELECT
+        notification_id,
+        notification_type,
+        message,
+        related_loan_id,
+        related_fine_id,
+        is_read,
+        created_at,
+        sent_via_email
+      FROM notifications
+      WHERE member_id = ? AND is_read = FALSE
+      ORDER BY created_at DESC
+      LIMIT ?`,
+      [memberId, limit]
+    );
+
+    return notifications;
+  } catch (error) {
+    console.error('Error fetching unread notifications:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get all notifications for a member (with pagination)
+ * @param {number} memberId - Member ID
+ * @param {number} page - Page number (1-indexed)
+ * @param {number} pageSize - Number of notifications per page
+ * @returns {Promise<Object>} - Paginated notifications
+ */
+async function getAllNotifications(memberId, page = 1, pageSize = 20) {
+  try {
+    const offset = (page - 1) * pageSize;
+
+    const [notifications] = await db.query(
+      `SELECT
+        notification_id,
+        notification_type,
+        message,
+        related_loan_id,
+        related_fine_id,
+        is_read,
+        created_at,
+        sent_via_email
+      FROM notifications
+      WHERE member_id = ?
+      ORDER BY created_at DESC
+      LIMIT ? OFFSET ?`,
+      [memberId, pageSize, offset]
+    );
+
+    const [[{ total }]] = await db.query(
+      'SELECT COUNT(*) as total FROM notifications WHERE member_id = ?',
+      [memberId]
+    );
+
+    return {
+      notifications,
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize)
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching all notifications:', error);
+    throw error;
+  }
+}
+
+/**
+ * Mark all notifications as read for a member
+ * @param {number} memberId - Member ID
+ * @returns {Promise<number>} - Number of notifications marked as read
+ */
+async function markAllAsRead(memberId) {
+  try {
+    const [result] = await db.query(
+      'UPDATE notifications SET is_read = TRUE WHERE member_id = ? AND is_read = FALSE',
+      [memberId]
+    );
+
+    return result.affectedRows;
+  } catch (error) {
+    console.error('Error marking all notifications as read:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete old read notifications (cleanup function)
+ * @param {number} daysOld - Delete notifications older than this many days
+ * @returns {Promise<number>} - Number of notifications deleted
+ */
+async function deleteOldNotifications(daysOld = 90) {
+  try {
+    const [result] = await db.query(
+      'DELETE FROM notifications WHERE is_read = TRUE AND created_at < DATE_SUB(NOW(), INTERVAL ? DAY)',
+      [daysOld]
+    );
+
+    console.log(`Deleted ${result.affectedRows} old notifications`);
+    return result.affectedRows;
+  } catch (error) {
+    console.error('Error deleting old notifications:', error);
+    throw error;
+  }
+}
+
+module.exports = {
+  createNotification,
+  markAsRead,
+  getUnreadNotifications,
+  getAllNotifications,
+  markAllAsRead,
+  deleteOldNotifications
+};

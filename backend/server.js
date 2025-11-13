@@ -6,6 +6,7 @@ require('dotenv').config(); // Load environment variables from .env
 // Import our files
 const db = require('./config/db'); // Database connection
 const errorHandler = require('./middleware/errorHandler');
+const { initializeScheduler } = require('./jobs/notificationScheduler');
 
 
 // Create Express app
@@ -72,4 +73,8 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+
+  // Initialize notification scheduler for due date reminders
+  initializeScheduler();
+  console.log('Notification scheduler initialized');
 });

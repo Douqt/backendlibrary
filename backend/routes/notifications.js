@@ -1,6 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
+const {
+  getUnreadNotifications,
+  getAllNotifications,
+  markAsRead,
+  markAllAsRead
+} = require('../services/notificationService');
 
 // Middleware to extract user info from headers
 const getUserFromRequest = (req) => {
@@ -10,8 +16,120 @@ const getUserFromRequest = (req) => {
   };
 };
 
-// GET /api/notifications - Get all notifications for logged-in member
+// GET /api/notifications - Get notifications for logged-in member
 router.get('/', async (req, res) => {
+  const user = getUserFromRequest(req);
+
+  try {
+    // Only members can view notifications
+    if (user.user_type !== 'member') {
+      return res.json({ notifications: [], count: 0 });
+    }
+
+    const memberId = user.user_id;
+
+    // Get unread notifications from database
+    const notifications = await getUnreadNotifications(memberId, 50);
+
+    // Transform to match frontend format
+    const formattedNotifications = notifications.map(notif => ({
+      notification_id: notif.notification_id,
+      type: notif.notification_type,
+      message: notif.message,
+      created_at: notif.created_at,
+      is_read: notif.is_read,
+      related_loan_id: notif.related_loan_id,
+      related_fine_id: notif.related_fine_id,
+      // Map notification type to navigation link
+      link: notif.notification_type.includes('loan') ? 'loans' :
+            notif.notification_type.includes('fine') ? 'fines' : 'loans'
+    }));
+
+    res.json({
+      notifications: formattedNotifications,
+      count: formattedNotifications.length
+    });
+
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    res.status(500).json({ error: 'Failed to fetch notifications' });
+  }
+});
+
+// GET /api/notifications/history - Get all notifications with pagination
+router.get('/history', async (req, res) => {
+  const user = getUserFromRequest(req);
+
+  try {
+    if (user.user_type !== 'member') {
+      return res.status(403).json({ error: 'Only members can view notification history' });
+    }
+
+    const memberId = user.user_id;
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 20;
+
+    const result = await getAllNotifications(memberId, page, pageSize);
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Error fetching notification history:', error);
+    res.status(500).json({ error: 'Failed to fetch notification history' });
+  }
+});
+
+// POST /api/notifications/:id/read - Mark notification as read
+router.post('/:id/read', async (req, res) => {
+  const user = getUserFromRequest(req);
+
+  try {
+    if (user.user_type !== 'member') {
+      return res.status(403).json({ error: 'Only members can mark notifications as read' });
+    }
+
+    const notificationId = parseInt(req.params.id);
+    const memberId = user.user_id;
+
+    const success = await markAsRead(notificationId, memberId);
+
+    if (success) {
+      res.json({ success: true, message: 'Notification marked as read' });
+    } else {
+      res.status(404).json({ error: 'Notification not found or already read' });
+    }
+
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    res.status(500).json({ error: 'Failed to mark notification as read' });
+  }
+});
+
+// POST /api/notifications/read-all - Mark all notifications as read
+router.post('/read-all', async (req, res) => {
+  const user = getUserFromRequest(req);
+
+  try {
+    if (user.user_type !== 'member') {
+      return res.status(403).json({ error: 'Only members can mark notifications as read' });
+    }
+
+    const memberId = user.user_id;
+    const count = await markAllAsRead(memberId);
+
+    res.json({
+      success: true,
+      message: `${count} notification(s) marked as read`
+    });
+
+  } catch (error) {
+    console.error('Error marking all notifications as read:', error);
+    res.status(500).json({ error: 'Failed to mark notifications as read' });
+  }
+});
+
+// Legacy computed notifications route (keeping for backward compatibility)
+router.get('/computed', async (req, res) => {
   const user = getUserFromRequest(req);
 
   try {

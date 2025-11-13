@@ -213,7 +213,7 @@ const Checkout = ({ user }) => {
       });
 
       if (response.ok) {
-        const result = await response.json();
+        await response.json();
         alert(`"${item.title}" has been checked out successfully!`);
 
         // Update the item copies count and availability in real-time

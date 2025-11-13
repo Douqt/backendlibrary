@@ -1,6 +1,7 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Library, Menu, User, LogOut } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 
 const Header = ({ user, onSignIn, onLogout }) => {
   const navigate = useNavigate();
@@ -184,6 +185,9 @@ const Header = ({ user, onSignIn, onLogout }) => {
           </Button>
           {user ? (
             <div className="flex items-center gap-4 ml-4">
+              {/* Notification Bell for members */}
+              <NotificationBell user={user} setActiveTab={(tab) => navigate(`/${tab}`)} />
+
               <button
                 onClick={handleProfileClick}
                 className="flex items-center gap-2 text-sm min-w-0 hover:bg-accent px-2 py-1 rounded-md transition-colors cursor-pointer"

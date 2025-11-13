@@ -4,6 +4,7 @@ const db = require('../config/db');
 const asyncHandler = require('../middleware/asyncHandler');
 const fineService = require('../services/fineService');
 const priorityQueueService = require('../services/priorityQueueService');
+const { createNotification } = require('../services/notificationService');
 
 // Middleware to extract user info from headers
 const getUserFromRequest = (req) => {
@@ -298,11 +299,67 @@ router.post('/', asyncHandler(async (req, res) => {
     [member_id]
   );
 
+  const loanId = result.insertId;
+
+  // Get item details and branch name for notification
+  let itemTitle = `${item_type} #${item_id}`;
+  let branchName = 'Library';
+
+  try {
+    // Get item title based on type
+    if (item_type === 'book') {
+      const [bookDetails] = await db.query('SELECT title FROM books WHERE book_id = ?', [item_id]);
+      if (bookDetails.length > 0) {
+        itemTitle = bookDetails[0].title;
+      }
+    } else if (item_type === 'movie') {
+      const [movieDetails] = await db.query('SELECT title FROM movies WHERE movie_id = ?', [item_id]);
+      if (movieDetails.length > 0) {
+        itemTitle = movieDetails[0].title;
+      }
+    } else if (item_type === 'article') {
+      const [articleDetails] = await db.query('SELECT title FROM articles WHERE artic_id = ?', [item_id]);
+      if (articleDetails.length > 0) {
+        itemTitle = articleDetails[0].title;
+      }
+    } else if (item_type === 'electronic_rental') {
+      const [electronicDetails] = await db.query('SELECT device_name as title FROM electronics WHERE libra_id = ?', [item_id]);
+      if (electronicDetails.length > 0) {
+        itemTitle = electronicDetails[0].title;
+      }
+    }
+
+    // Get branch name if branch_id provided
+    if (branch_id) {
+      const [branchDetails] = await db.query('SELECT name FROM branches WHERE branch_id = ?', [branch_id]);
+      if (branchDetails.length > 0) {
+        branchName = branchDetails[0].name;
+      }
+    }
+
+    // Send loan confirmation notification
+    await createNotification({
+      memberId: member_id,
+      notificationType: 'loan_confirmation',
+      data: {
+        itemTitle,
+        loanDate: new Date().toISOString().split('T')[0],
+        dueDate: calculatedDueDate,
+        branchName
+      },
+      relatedLoanId: loanId,
+      sendEmail: true
+    });
+  } catch (notificationError) {
+    // Log error but don't fail the loan creation
+    console.error('Failed to send loan confirmation notification:', notificationError);
+  }
+
   res.status(201).json({
     success: true,
     message: 'Loan created successfully',
     data: {
-      loan_id: result.insertId,
+      loan_id: loanId,
       member_id,
       item_id: actualItemId,
       item_type: finalItemType,

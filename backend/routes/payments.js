@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
+const { createNotification } = require('../services/notificationService');
 
 // Middleware to extract user info from headers
 const getUserFromRequest = (req) => {
@@ -115,6 +116,62 @@ router.post('/', async (req, res) => {
       'UPDATE fines SET payment_status = ? WHERE fine_id = ?',
       ['paid', fine_id]
     );
+
+    // Get item details for notification
+    let itemTitle = null;
+    try {
+      const [loanDetails] = await db.query(
+        `SELECT l.item_type, l.item_id
+         FROM fines f
+         JOIN loan l ON f.loan_id = l.loan_id
+         WHERE f.fine_id = ?`,
+        [fine_id]
+      );
+
+      if (loanDetails.length > 0) {
+        const { item_type, item_id } = loanDetails[0];
+
+        if (item_type === 'book') {
+          const [bookDetails] = await db.query('SELECT title FROM books WHERE book_id = ?', [item_id]);
+          if (bookDetails.length > 0) {
+            itemTitle = bookDetails[0].title;
+          }
+        } else if (item_type === 'movie') {
+          const [movieDetails] = await db.query('SELECT title FROM movies WHERE movie_id = ?', [item_id]);
+          if (movieDetails.length > 0) {
+            itemTitle = movieDetails[0].title;
+          }
+        } else if (item_type === 'article') {
+          const [articleDetails] = await db.query('SELECT title FROM articles WHERE artic_id = ?', [item_id]);
+          if (articleDetails.length > 0) {
+            itemTitle = articleDetails[0].title;
+          }
+        } else if (item_type === 'electronic_rental') {
+          const [electronicDetails] = await db.query('SELECT device_name as title FROM electronics WHERE libra_id = ?', [item_id]);
+          if (electronicDetails.length > 0) {
+            itemTitle = electronicDetails[0].title;
+          }
+        }
+      }
+
+      // Send fine paid notification
+      await createNotification({
+        memberId: fine.member_id,
+        notificationType: 'fine_paid',
+        data: {
+          amount: fine.amount.toFixed(2),
+          paymentDate: new Date().toISOString().split('T')[0],
+          paymentMethod: 'Credit/Debit Card',
+          fineReason: fine.reason,
+          itemTitle: itemTitle
+        },
+        relatedFineId: fine_id,
+        sendEmail: true
+      });
+    } catch (notificationError) {
+      // Log error but don't fail the payment
+      console.error('Failed to send payment confirmation notification:', notificationError);
+    }
 
     res.json({
       success: true,
