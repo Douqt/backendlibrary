@@ -24,7 +24,7 @@ router.get("/", async (req, res) => {
     if (user_type === 'member' && user_id) {
       // Members can only see their own fines
       whereClause = 'WHERE f.member_id = ?';
-      params.push(user_id);
+      params.push(parseInt(user_id, 10)); // Convert to number for database query
     }
     // Staff can see all fines or filter by member_id
 
@@ -88,8 +88,12 @@ router.patch("/:fine_id", async (req, res) => {
       return res.status(404).json({ error: "Fine not found" });
     }
 
+    // Convert user_id to number for comparison (headers come as strings)
+    const numericUserId = parseInt(user_id, 10);
+
     // Members can only pay their own fines
-    if (user_type === 'member' && fines[0].member_id !== user_id) {
+    if (user_type === 'member' && fines[0].member_id !== numericUserId) {
+      console.log(`Access denied: user ${numericUserId} tried to pay fine for member ${fines[0].member_id}`);
       return res.status(403).json({ error: "You can only pay your own fines" });
     }
 
@@ -100,6 +104,7 @@ router.patch("/:fine_id", async (req, res) => {
       WHERE fine_id = ?
     `, [payment_status, fine_id]);
 
+    console.log(`Fine ${fine_id} payment status updated to ${payment_status} by ${user_type} ${numericUserId}`);
     res.json({ message: "Fine status updated successfully" });
   } catch (err) {
     console.error("Error updating fine:", err);
