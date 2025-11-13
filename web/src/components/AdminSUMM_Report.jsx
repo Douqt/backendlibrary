@@ -11,10 +11,11 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-// OPTIONAL: if you centralize API base like InfoUpdate does,
 // import { API_URL } from '../config/api';
 // const API_BASE_URL = API_URL;
-const API_BASE_URL = ''; // leave '' if your fetch paths are already proxied (e.g., /api/...)
+const API_BASE_URL = API_URL;
+// for fetching/updating the currently logged-in user's info.
+const USER_INFO_ENDPOINT = `${API_BASE_URL}/api/users/me`;
 
 const AdminSUMM_Report = () => {
   const [reportType, setReportType] = useState('biweekly'); // default report
