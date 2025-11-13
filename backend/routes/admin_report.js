@@ -140,4 +140,49 @@ router.get(
   })
 );
 
+// Top borrowers: member_name, total_loans
+router.get(
+  '/top-borrowers',
+  asyncHandler(async (req, res) => {
+    const [rows] = await db.query(`
+      SELECT member_name, total_loans
+      FROM vw_member_summary
+      ORDER BY total_loans DESC, member_name ASC
+    `);
+    res.status(200).json({ success: true, data: { rows } });
+  })
+);
+
+// Fines accrued vs paid: alias to match frontend keys
+router.get(
+  '/fines-accrued',
+  asyncHandler(async (req, res) => {
+    // using vw_staff_member_report so we can alias its columns
+    const [rows] = await db.query(`
+      SELECT 
+        member_name,
+        fines_accrued     AS total_fines_amount,
+        paid_fines_value  AS total_fines_paid
+      FROM vw_staff_member_report
+      ORDER BY total_fines_amount DESC, member_name ASC
+    `);
+    res.status(200).json({ success: true, data: { rows } });
+  })
+);
+
+// Restricted members: member_name, curr_loans, max_loans
+router.get(
+  '/restricted-members',
+  asyncHandler(async (req, res) => {
+    const [rows] = await db.query(`
+      SELECT member_name, curr_loans, max_loans
+      FROM vw_member_summary
+      WHERE is_restricted = 1
+      ORDER BY member_name DESC
+    `);
+    res.status(200).json({ success: true, data: { rows } });
+  })
+);
+
 module.exports = router;
+
