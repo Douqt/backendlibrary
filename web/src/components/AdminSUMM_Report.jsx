@@ -1,113 +1,196 @@
 import { useState } from 'react';
+import { Card, CardContent } from './ui/card';
+import { UserCog } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
+
+// OPTIONAL: if you centralize API base like InfoUpdate does,
+// import { API_URL } from '../config/api';
+// const API_BASE_URL = API_URL;
+const API_BASE_URL = ''; // leave '' if your fetch paths are already proxied (e.g., /api/...)
 
 const AdminSUMM_Report = () => {
-  const [reportData, setReportData] = useState([]);
+  const [reportType, setReportType] = useState('biweekly'); // default report
+  const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleGenerateReport = async () => {
     setLoading(true);
+    setError('');
+    setChartData([]);
+
     try {
-      const res = await fetch('/api/admin-report/summary', {
-        credentials: 'include', // or Authorization header
-      });
-      const json = await res.json();
-      if (!json.success) throw new Error(json.message || 'Failed to load report');
+      // Map each drop-down choice to an API route and a post-processor
+      // Keep your existing summary route for biweekly (from your original file).
+      let endpoint = '';
+      let transform = (json) => ({ data: [], xKey: '', series: [] });
 
-      // Aggregate total loans per bi-week (all members combined)
-      const byPeriod = {};
-      json.data.biweekly.forEach((row) => {
-        const key = row.biweek_label;
-        if (!byPeriod[key]) {
-          byPeriod[key] = {
-            biweek_label: key,
-            loans_in_period: 0,
+      switch (reportType) {
+        case 'biweekly':
+          endpoint = `${API_BASE_URL}/api/admin/report/summary`; // your original route
+          transform = (json) => {
+            if (!json?.success) throw new Error(json?.message || 'Failed to load report');
+
+            // Aggregate total loans per bi-week (all members combined), preserving your logic
+            const byPeriod = {};
+            json.data.biweekly.forEach((row) => {
+              const key = row.biweek_label;
+              if (!byPeriod[key]) byPeriod[key] = { biweek_label: key, loans_in_period: 0 };
+              byPeriod[key].loans_in_period += row.loans_in_period;
+            });
+
+            return {
+              data: Object.values(byPeriod),
+              xKey: 'biweek_label',
+              series: [{ key: 'loans_in_period', label: 'Loans' }],
+            };
           };
-        }
-        byPeriod[key].loans_in_period += row.loans_in_period;
-      });
+          break;
 
-      setReportData(Object.values(byPeriod));
+        case 'topBorrowers':
+          endpoint = `${API_BASE_URL}/api/admin/report/top-borrowers`; // e.g., SELECT member_name, total_loans
+          transform = (json) => {
+            if (!json?.success) throw new Error(json?.message || 'Failed to load report');
+            // Expect rows like { member_name, total_loans }
+            return {
+              data: json.data.rows || [],
+              xKey: 'member_name',
+              series: [{ key: 'total_loans', label: 'Total Loans' }],
+            };
+          };
+          break;
+
+        case 'finesAccrued':
+          endpoint = `${API_BASE_URL}/api/admin/report/fines-accrued`; // e.g., SELECT member_name, total_fines_amount, total_fines_paid
+          transform = (json) => {
+            if (!json?.success) throw new Error(json?.message || 'Failed to load report');
+            // Expect rows like { member_name, total_fines_amount, total_fines_paid }
+            return {
+              data: json.data.rows || [],
+              xKey: 'member_name',
+              series: [
+                { key: 'total_fines_amount', label: 'Fines Accrued' },
+                { key: 'total_fines_paid', label: 'Fines Paid' },
+              ],
+            };
+          };
+          break;
+
+        case 'restrictedMembers':
+          endpoint = `${API_BASE_URL}/api/admin/report/restricted-members`; // e.g., SELECT member_name, curr_loans, max_loans
+          transform = (json) => {
+            if (!json?.success) throw new Error(json?.message || 'Failed to load report');
+            // Expect rows like { member_name, curr_loans, max_loans }
+            return {
+              data: json.data.rows || [],
+              xKey: 'member_name',
+              series: [
+                { key: 'curr_loans', label: 'Current Loans' },
+                { key: 'max_loans', label: 'Max Loans' },
+              ],
+            };
+          };
+          break;
+
+        default:
+          throw new Error('Unknown report type');
+      }
+
+      const res = await fetch(endpoint, { credentials: 'include' });
+      const json = await res.json();
+      const { data, xKey, series } = transform(json);
+
+      // decorate each series with a consistent name for <Bar dataKey="...">
+      setChartData({ rows: data, xKey, series });
     } catch (err) {
       console.error('Error loading admin report:', err);
-      alert('Could not load report, check console/logs.');
+      setError(err.message || 'Could not load report. Check server logs.');
     } finally {
       setLoading(false);
     }
   };
 
+  const hasData = Array.isArray(chartData?.rows) && chartData.rows.length > 0;
+
   return (
-    <div className="w-full max-w-4xl mx-auto p-4">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold">Bi-weekly Loan Report</h2>
-        <button
-          onClick={handleGenerateReport}
-          disabled={loading}
-          className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-60"
-        >
-          {loading ? 'Generating…' : 'Generate Report'}
-        </button>
-      </div>
+    <section className="py-10 px-4 w-full" id="admin-reports">
+      <div className="max-w-5xl mx-auto w-full">
+        {/* Consistent card/header style like InfoUpdate */}
+        <Card className="bg-gradient-card border-border animate-fade-in">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="inline-flex p-3 rounded-xl bg-primary/10">
+                  <UserCog className="h-8 w-8 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-2xl md:text-3xl font-bold mb-1 text-foreground">
+                    Admin Summary Reports
+                  </h2>
+                  <p className="text-muted-foreground text-sm md:text-base">
+                    Choose a report from the drop-down and click Generate to visualize results.
+                  </p>
+                </div>
+              </div>
 
-      {reportData.length > 0 && (
-        <div className="bg-white rounded-xl shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">Loan Activity by Bi-Week</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse border border-gray-300">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="border border-gray-300 px-4 py-2 text-left">Bi-Week Period</th>
-                  <th className="border border-gray-300 px-4 py-2 text-right">Total Loans</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reportData.map((row, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="border border-gray-300 px-4 py-2">{row.biweek_label}</td>
-                    <td className="border border-gray-300 px-4 py-2 text-right font-semibold">{row.loans_in_period}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              {/* Drop-down + Generate button (mirrors InfoUpdate button style) */}
+              <div className="flex items-center gap-2">
+                <select
+                  value={reportType}
+                  onChange={(e) => setReportType(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  aria-label="Select report type"
+                >
+                  <option value="biweekly">Bi-weekly Loans (All Members)</option>
+                  <option value="topBorrowers">Top Borrowers</option>
+                  <option value="finesAccrued">Fines Accrued vs Paid</option>
+                  <option value="restrictedMembers">Restricted Members</option>
+                </select>
 
-          <div className="mt-6">
-            <h4 className="text-md font-semibold mb-2">Summary Statistics</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-blue-50 p-3 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">
-                  {reportData.reduce((sum, row) => sum + row.loans_in_period, 0)}
-                </div>
-                <div className="text-sm text-blue-800">Total Loans</div>
-              </div>
-              <div className="bg-green-50 p-3 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">
-                  {reportData.length}
-                </div>
-                <div className="text-sm text-green-800">Periods</div>
-              </div>
-              <div className="bg-purple-50 p-3 rounded-lg">
-                <div className="text-2xl font-bold text-purple-600">
-                  {Math.max(...reportData.map(row => row.loans_in_period))}
-                </div>
-                <div className="text-sm text-purple-800">Peak Period</div>
-              </div>
-              <div className="bg-orange-50 p-3 rounded-lg">
-                <div className="text-2xl font-bold text-orange-600">
-                  {(reportData.reduce((sum, row) => sum + row.loans_in_period, 0) / reportData.length).toFixed(1)}
-                </div>
-                <div className="text-sm text-orange-800">Average</div>
+                <button
+                  type="button"
+                  onClick={handleGenerateReport}
+                  disabled={loading}
+                  className="px-4 py-2 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 disabled:opacity-60 text-sm md:text-base"
+                >
+                  {loading ? 'Generating…' : 'Generate'}
+                </button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
 
-      {reportData.length === 0 && !loading && (
-        <div className="text-center py-12">
-          <p className="text-gray-500">Click "Generate Report" to load bi-weekly loan data.</p>
-        </div>
-      )}
-    </div>
+            {/* Error */}
+            {error && (
+              <p className="mt-4 text-sm text-destructive">{error}</p>
+            )}
+
+            {/* Chart */}
+            {hasData && (
+              <div className="mt-6 h-96 bg-card rounded-xl border border-border shadow">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData.rows}>
+                    <XAxis dataKey={chartData.xKey} />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    {chartData.series.map((s) => (
+                      <Bar key={s.key} dataKey={s.key} name={s.label} />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </section>
   );
 };
 
