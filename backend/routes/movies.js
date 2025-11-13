@@ -88,4 +88,81 @@ router.get('/:id', asyncHandler(async (req, res) => {
     });
 }));
 
+//POST /api/movies - Add new movie
+router.post('/', asyncHandler(async(req, res) => {
+    const {
+        branch_id,
+        title,
+        isan,
+        release_date,
+        director_id,
+        publisher_id,
+        media_type,
+        location_section,
+        copy_amount,
+        available
+    } = req.body;
+
+    // Validate required fields
+    if(!branch_id || !title || !location_section || copy_amount === undefined){
+        return res.status(400).json({
+            success: false,
+            message: 'Please provide branch_id, title, location_section, and copy_amount'
+        });
+    }
+
+    // Validate media_type enum if provided
+    if(media_type && !['DVD', 'Blu-ray', 'Digital', 'VHS'].includes(media_type)){
+        return res.status(400).json({
+            success: false,
+            message: 'media_type must be one of: DVD, Blu-ray, Digital, VHS'
+        });
+    }
+
+    // Validate copy_amount is non-negative
+    if(copy_amount < 0){
+        return res.status(400).json({
+            success: false,
+            message: 'copy_amount must be greater than or equal to 0'
+        });
+    }
+
+    // Insert movie
+    const [result] = await db.query(
+        `INSERT INTO movies
+        (branch_id, title, isan, release_date, director_id, publisher_id, media_type, location_section, copy_amount, available)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+            branch_id,
+            title,
+            isan || null,
+            release_date || null,
+            director_id || null,
+            publisher_id || null,
+            media_type || 'DVD',
+            location_section,
+            copy_amount,
+            available !== undefined ? available : true
+        ]
+    );
+
+    res.status(201).json({
+        success: true,
+        message: 'Movie created successfully!',
+        data: {
+            movie_id: result.insertId,
+            branch_id,
+            title,
+            isan,
+            release_date,
+            director_id,
+            publisher_id,
+            media_type: media_type || 'DVD',
+            location_section,
+            copy_amount,
+            available: available !== undefined ? available : true
+        }
+    });
+}));
+
 module.exports = router;

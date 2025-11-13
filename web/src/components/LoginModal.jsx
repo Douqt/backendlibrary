@@ -81,7 +81,7 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
               </label>
               <input
                 type="text"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white text-gray-900"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
@@ -95,7 +95,7 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
               </label>
               <input
                 type="password"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white text-gray-900"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required

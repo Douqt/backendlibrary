@@ -312,7 +312,7 @@ const Checkout = ({ user }) => {
                 placeholder="Search titles, authors, details..."
                 value={localSearch}
                 onChange={handleLocalSearch}
-                className="flex-1 px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                className="flex-1 px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white text-gray-900"
               />
               <Button onClick={clearAllFilters} variant="outline">
                 Clear All

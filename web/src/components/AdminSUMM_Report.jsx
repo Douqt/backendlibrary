@@ -3,13 +3,12 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } fro
 import { Card, CardContent } from './ui/card';
 import { UserCog } from 'lucide-react';
 
-// import { API_URL } from '../config/api';
-// const API_BASE_URL = API_URL;
-const API_BASE_URL = '';
+import { API_BASE_URL } from '../config';
 
 const AdminSUMM_Report = () => {
   const [reportType, setReportType] = useState('biweekly'); // default report
   const [chartData, setChartData] = useState([]);
+  const [tableData, setTableData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -26,7 +25,7 @@ const AdminSUMM_Report = () => {
 
       switch (reportType) {
         case 'biweekly':
-          endpoint = `${API_BASE_URL}/api/admin/report/summary`; // your original route
+          endpoint = `${API_BASE_URL}/admin/report/summary`; // your original route
           transform = (json) => {
             if (!json?.success) throw new Error(json?.message || 'Failed to load report');
 
@@ -40,6 +39,7 @@ const AdminSUMM_Report = () => {
 
             return {
               data: Object.values(byPeriod),
+              tableData: json.data.biweekly,
               xKey: 'biweek_label',
               series: [{ key: 'loans_in_period', label: 'Loans' }],
             };
@@ -47,7 +47,7 @@ const AdminSUMM_Report = () => {
           break;
 
         case 'topBorrowers':
-          endpoint = `${API_BASE_URL}/api/admin/report/top-borrowers`; // e.g., SELECT member_name, total_loans
+          endpoint = `${API_BASE_URL}/admin/report/top-borrowers`; // e.g., SELECT member_name, total_loans
           transform = (json) => {
             if (!json?.success) throw new Error(json?.message || 'Failed to load report');
             // Expect rows like { member_name, total_loans }
@@ -60,7 +60,7 @@ const AdminSUMM_Report = () => {
           break;
 
         case 'finesAccrued':
-          endpoint = `${API_BASE_URL}/api/admin/report/fines-accrued`; // e.g., SELECT member_name, total_fines_amount, total_fines_paid
+          endpoint = `${API_BASE_URL}/admin/report/fines-accrued`; // e.g., SELECT member_name, total_fines_amount, total_fines_paid
           transform = (json) => {
             if (!json?.success) throw new Error(json?.message || 'Failed to load report');
             // Expect rows like { member_name, total_fines_amount, total_fines_paid }
@@ -75,32 +75,25 @@ const AdminSUMM_Report = () => {
           };
           break;
 
-        case 'restrictedMembers':
-          endpoint = `${API_BASE_URL}/api/admin/report/restricted-members`; // e.g., SELECT member_name, curr_loans, max_loans
-          transform = (json) => {
-            if (!json?.success) throw new Error(json?.message || 'Failed to load report');
-            // Expect rows like { member_name, curr_loans, max_loans }
-            return {
-              data: json.data.rows || [],
-              xKey: 'member_name',
-              series: [
-                { key: 'curr_loans', label: 'Current Loans' },
-                { key: 'max_loans', label: 'Max Loans' },
-              ],
-            };
-          };
-          break;
+
 
         default:
           throw new Error('Unknown report type');
       }
 
-      const res = await fetch(endpoint, { credentials: 'include' });
+      const userData = JSON.parse(localStorage.getItem('user'));
+      const headers = {
+        'x-user-type': userData.user_type,
+        'x-user-id': userData.user_type === 'member' ? userData.member_id : userData.staff_id
+      };
+
+      const res = await fetch(endpoint, { headers });
       const json = await res.json();
-      const { data, xKey, series } = transform(json);
+      const { data, xKey, series, tableData: rawTableData } = transform(json);
 
       // decorate each series with a consistent name for <Bar dataKey="...">
       setChartData({ rows: data, xKey, series });
+      setTableData(rawTableData || data);
     } catch (err) {
       console.error('Error loading admin report:', err);
       setError(err.message || 'Could not load report. Check server logs.');
@@ -137,13 +130,12 @@ const AdminSUMM_Report = () => {
                 <select
                   value={reportType}
                   onChange={(e) => setReportType(e.target.value)}
-                  className="px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="px-3 py-2 rounded-xl border border-input bg-white text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   aria-label="Select report type"
                 >
                   <option value="biweekly">Bi-weekly Loans (All Members)</option>
                   <option value="topBorrowers">Top Borrowers</option>
                   <option value="finesAccrued">Fines Accrued vs Paid</option>
-                  <option value="restrictedMembers">Restricted Members</option>
                 </select>
 
                 <button
@@ -176,6 +168,37 @@ const AdminSUMM_Report = () => {
                     ))}
                   </BarChart>
                 </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* Data Table */}
+            {tableData.length > 0 && (
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold mb-4 text-foreground">Detailed Data</h3>
+                <div className="bg-card rounded-xl border border-border shadow overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        {Object.keys(tableData[0] || {}).map((key) => (
+                          <th key={key} className="px-4 py-3 text-left font-medium text-muted-foreground border-b border-border">
+                            {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tableData.map((row, index) => (
+                        <tr key={index} className="border-b border-border hover:bg-muted/25">
+                          {Object.values(row).map((value, cellIndex) => (
+                            <td key={cellIndex} className="px-4 py-3 text-foreground">
+                              {value === null || value === undefined ? '-' : String(value)}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </CardContent>

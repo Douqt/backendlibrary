@@ -195,7 +195,7 @@ const PaymentModal = ({ fine, onClose, onSuccess, notificationRef }) => {
                 value={formData.cardNumber}
                 onChange={handleInputChange}
                 placeholder="1234-5678-9012-3456"
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 ${
                   errors.cardNumber ? 'border-red-500' : 'border-gray-300'
                 }`}
               />
@@ -216,7 +216,7 @@ const PaymentModal = ({ fine, onClose, onSuccess, notificationRef }) => {
                   value={formData.expirationDate}
                   onChange={handleInputChange}
                   placeholder="MM/YY"
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 ${
                     errors.expirationDate ? 'border-red-500' : 'border-gray-300'
                   }`}
                 />
@@ -234,7 +234,7 @@ const PaymentModal = ({ fine, onClose, onSuccess, notificationRef }) => {
                   value={formData.cvv}
                   onChange={handleInputChange}
                   placeholder="123"
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 ${
                     errors.cvv ? 'border-red-500' : 'border-gray-300'
                   }`}
                 />
@@ -255,7 +255,7 @@ const PaymentModal = ({ fine, onClose, onSuccess, notificationRef }) => {
                 value={formData.cardholderName}
                 onChange={handleInputChange}
                 placeholder="John Doe"
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 ${
                   errors.cardholderName ? 'border-red-500' : 'border-gray-300'
                 }`}
               />

@@ -14,7 +14,31 @@ async function runMigration(sqlFilePath, options = {}) {
 
   try {
     const sql = fs.readFileSync(sqlFilePath, 'utf8');
-    const statements = sql.split(';').filter(stmt => stmt.trim().length > 0);
+
+    // Handle DELIMITER changes for triggers
+    let delimiter = ';';
+    const statements = [];
+    let currentStatement = '';
+
+    const lines = sql.split('\n');
+    for (let line of lines) {
+      line = line.trim();
+      if (line.toUpperCase().startsWith('DELIMITER ')) {
+        delimiter = line.split(' ')[1];
+      } else if (line === delimiter) {
+        if (currentStatement.trim()) {
+          statements.push(currentStatement.trim());
+          currentStatement = '';
+        }
+      } else {
+        currentStatement += line + '\n';
+      }
+    }
+
+    // Add any remaining statement
+    if (currentStatement.trim()) {
+      statements.push(currentStatement.trim());
+    }
 
     for (let statement of statements) {
       statement = statement.trim();
@@ -61,9 +85,11 @@ async function runSql(sql, database) {
 }
 
 async function main() {
-  // Run soft delete migrations to existing tables
-  await runMigration('./migrations/add_soft_delete_to_books.sql');
-  await runMigration('./migrations/add_soft_delete_to_loans.sql');
+  // Create the necessary views for reports
+  console.log('Creating database views...');
+  await runMigration('./create_views.sql');
+
+  console.log('Views created successfully!');
 }
 
 main().catch(console.error);

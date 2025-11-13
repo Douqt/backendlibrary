@@ -86,4 +86,61 @@ router.get('/:id', asyncHandler(async (req, res) => {
     });
 }));
 
+//POST /api/articles - Add new article
+router.post('/', asyncHandler(async(req, res) => {
+    const {
+        branch_id,
+        title,
+        issn,
+        publisher_id,
+        copies,
+        available
+    } = req.body;
+
+    // Validate required fields
+    if(!branch_id || !title || copies === undefined){
+        return res.status(400).json({
+            success: false,
+            message: 'Please provide branch_id, title, and copies'
+        });
+    }
+
+    // Validate copies is non-negative
+    if(copies < 0){
+        return res.status(400).json({
+            success: false,
+            message: 'copies must be greater than or equal to 0'
+        });
+    }
+
+    // Insert article
+    const [result] = await db.query(
+        `INSERT INTO articles
+        (branch_id, title, issn, publisher_id, copies, available)
+        VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+            branch_id,
+            title,
+            issn || null,
+            publisher_id || null,
+            copies,
+            available !== undefined ? available : true
+        ]
+    );
+
+    res.status(201).json({
+        success: true,
+        message: 'Article created successfully!',
+        data: {
+            article_id: result.insertId,
+            branch_id,
+            title,
+            issn,
+            publisher_id,
+            copies,
+            available: available !== undefined ? available : true
+        }
+    });
+}));
+
 module.exports = router;

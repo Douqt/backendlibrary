@@ -111,42 +111,20 @@ const Header = ({ user, onSignIn, onLogout }) => {
               >
                 Holds
               </NavLink>
-              <NavLink
-                to="/events"
-                className={({ isActive }) =>
-                  `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                  }`
-                }
-              >
-                Events
-              </NavLink>
-              <NavLink
-                to="/services"
-                className={({ isActive }) =>
-                  `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:bg-accent'
-                  }`
-                }
-              >
-                Services
-              </NavLink>
-              <NavLink
-                to="/reservations"
-                className={({ isActive }) =>
-                  `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                  }`
-                }
-              >
-                Reservations
-              </NavLink>
+              {(user.user_type === 'staff') && (
+                <NavLink
+                  to="/add-items"
+                  className={({ isActive }) =>
+                    `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                    }`
+                  }
+                >
+                  Add Items
+                </NavLink>
+              )}
               {user.user_type === 'member' && (
                 <NavLink
                   to="/payment-history"
@@ -161,9 +139,9 @@ const Header = ({ user, onSignIn, onLogout }) => {
                   Payments
                 </NavLink>
               )}
-              {user.user_type === 'staff' && (user.role === 'admin' || user.position === 'admin') && (
+              {user.user_type === 'staff' && (
                 <NavLink
-                  to="/admin-report"
+                  to="/reports"
                   className={({ isActive }) =>
                     `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                       isActive

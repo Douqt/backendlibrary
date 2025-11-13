@@ -69,13 +69,21 @@ router.get('/:id', asyncHandler(async (req, res) => {
 
 // POST /api/staff - Create new staff member (Admin only)
 router.post('/', asyncHandler(async (req, res) => {
-    const { name, email, ssn, branch_id, hourly, position } = req.body;
+    const { name, email, ssn, branch_id, hourly, position, username, password, role } = req.body;
 
     // Validate required fields
     if (!name || !email || !branch_id) {
         return res.status(400).json({
             success: false,
             message: 'Name, email, and branch_id are required'
+        });
+    }
+
+    // Validate auth fields if provided
+    if ((username && !password) || (!username && password)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Both username and password must be provided together'
         });
     }
 
@@ -124,10 +132,14 @@ router.post('/', asyncHandler(async (req, res) => {
 
     const newStaffId = result.insertId;
 
-    // Create auth record if needed
+    // Create auth record - use custom credentials if provided, otherwise defaults
+    const authUsername = username || email;
+    const authPassword = password || 'password123';
+    const authRole = role || 'staff';
+
     await db.query(
         'INSERT INTO staff_auth (staff_id, username, password, role) VALUES (?, ?, ?, ?)',
-        [newStaffId, email, 'password123', 'staff'] // Default password, should be changed
+        [newStaffId, authUsername, authPassword, authRole]
     );
 
     res.status(201).json({

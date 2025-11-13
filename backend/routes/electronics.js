@@ -78,4 +78,64 @@ router.get('/:id', asyncHandler(async (req, res) => {
     });
 }));
 
+//POST /api/electronics - Add new electronics item
+router.post('/', asyncHandler(async(req, res) => {
+    const {
+        branch_id,
+        device_name,
+        serial_num,
+        manufact_date,
+        maker,
+        copy_amount,
+        available
+    } = req.body;
+
+    // Validate required fields
+    if(!branch_id || !device_name || copy_amount === undefined){
+        return res.status(400).json({
+            success: false,
+            message: 'Please provide branch_id, device_name, and copy_amount'
+        });
+    }
+
+    // Validate copy_amount is non-negative
+    if(copy_amount < 0){
+        return res.status(400).json({
+            success: false,
+            message: 'copy_amount must be greater than or equal to 0'
+        });
+    }
+
+    // Insert electronics item
+    const [result] = await db.query(
+        `INSERT INTO electronics
+        (branch_id, device_name, serial_num, manufact_date, maker, copy_amount, available)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+            branch_id,
+            device_name,
+            serial_num || null,
+            manufact_date || null,
+            maker || null,
+            copy_amount,
+            available !== undefined ? available : true
+        ]
+    );
+
+    res.status(201).json({
+        success: true,
+        message: 'Electronics item created successfully!',
+        data: {
+            electronics_id: result.insertId,
+            branch_id,
+            device_name,
+            serial_num,
+            manufact_date,
+            maker,
+            copy_amount,
+            available: available !== undefined ? available : true
+        }
+    });
+}));
+
 module.exports = router;
