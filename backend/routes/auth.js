@@ -14,21 +14,25 @@ router.post('/register/member', asyncHandler(async (req, res) => {
     } = req.body;
 
     // STEP 1: Validate all required fields
-    if (!member_name || !member_email || !member_type || !username || !password) {
+    if (!member_name || !member_email || !username || !password) {
         return res.status(400).json({
             success: false,
-            message: 'Please provide member_name, member_email, member_type, username, and password'
+            message: 'Please provide member_name, member_email, username, and password'
         });
     }
 
-    // STEP 2: Validate member_type
-    const validMemberTypes = ['local', 'student', 'faculty'];
-    if (!validMemberTypes.includes(member_type)) {
-        return res.status(400).json({
-            success: false,
-            message: 'Invalid member_type. Must be: local, student, or faculty'
-        });
+    // STEP 2: Validate member_type if provided (for future use), but always set to 'local' for now
+    if (member_type) {
+        const validMemberTypes = ['local', 'student', 'faculty'];
+        if (!validMemberTypes.includes(member_type)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid member_type. Must be: local, student, or faculty'
+            });
+        }
     }
+    // Always default to 'local' until staff validates
+    const finalMemberType = 'local';
 
     // STEP 3: Check if email is already registered
     const [existingEmail] = await db.query(
@@ -59,7 +63,7 @@ router.post('/register/member', asyncHandler(async (req, res) => {
     // STEP 5: Create member record
     const [memberResult] = await db.query(
         'INSERT INTO member (member_name, member_email, member_type, join_date, status) VALUES (?, ?, ?, CURDATE(), ?)',
-        [member_name, member_email, member_type, 'Active']
+        [member_name, member_email, finalMemberType, 'Active']
     );
 
     const newMemberId = memberResult.insertId;
@@ -78,7 +82,7 @@ router.post('/register/member', asyncHandler(async (req, res) => {
             member_id: newMemberId,
             member_name,
             member_email,
-            member_type,
+            member_type: finalMemberType,
             username,
             type: 'member'
         }

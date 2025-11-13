@@ -65,28 +65,64 @@ router.get('/', asyncHandler(async (req, res) => {
 
   const [requests] = await db.query(query, params);
 
-  // Enrich requests with item details
+  // Enrich requests with item details and auto-create loans for fulfilled holds
   for (let request of requests) {
     const compositeId = request.item_id;
 
     // Parse composite ID to determine type and actual ID
-    let actualItemId, itemType;
+    let actualItemId, itemType, branchId = 1;
     if (compositeId >= 4000000) {
       itemType = 'electronic';
       actualItemId = compositeId - 4000000;
+      // Get branch_id from electronics table
+      const [branchResult] = await db.query('SELECT branch_id FROM electronics WHERE libra_id = ?', [actualItemId]);
+      if (branchResult.length > 0) branchId = branchResult[0].branch_id;
     } else if (compositeId >= 3000000) {
       itemType = 'article';
       actualItemId = compositeId - 3000000;
+      // Get branch_id from articles table
+      const [branchResult] = await db.query('SELECT branch_id FROM articles WHERE artic_id = ?', [actualItemId]);
+      if (branchResult.length > 0) branchId = branchResult[0].branch_id;
     } else if (compositeId >= 2000000) {
       itemType = 'movie';
       actualItemId = compositeId - 2000000;
+      // Get branch_id from movies table
+      const [branchResult] = await db.query('SELECT branch_id FROM movies WHERE movie_id = ?', [actualItemId]);
+      if (branchResult.length > 0) branchId = branchResult[0].branch_id;
     } else if (compositeId >= 1000000) {
       itemType = 'book';
       actualItemId = compositeId - 1000000;
+      // Get branch_id from books table
+      const [branchResult] = await db.query('SELECT branch_id FROM books WHERE book_id = ?', [actualItemId]);
+      if (branchResult.length > 0) branchId = branchResult[0].branch_id;
     } else {
       // Fallback for old format
-      actualItemId = compositeId;
       itemType = 'book';
+      actualItemId = compositeId;
+      // Get branch_id from books table
+      const [branchResult] = await db.query('SELECT branch_id FROM books WHERE book_id = ?', [actualItemId]);
+      if (branchResult.length > 0) branchId = branchResult[0].branch_id;
+    }
+
+    // Auto-create loan for fulfilled holds that don't have loans
+    if (request.status === 'fulfilled') {
+      const [existingLoan] = await db.query(
+        'SELECT loan_id FROM loan WHERE member_id = ? AND item_id = ? AND item_type = ? AND return_ts IS NULL',
+        [request.member_id, actualItemId, itemType === 'electronic' ? 'electronic_rental' : itemType]
+      );
+
+      if (existingLoan.length === 0) {
+        try {
+          await db.query(
+            `INSERT INTO loan (item_id, item_type, member_id, loan_date, due_date, branch_id)
+             VALUES (?, ?, ?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 14 DAY), ?)`,
+            [actualItemId, itemType === 'electronic' ? 'electronic_rental' : itemType, request.member_id, branchId]
+          );
+          console.log(`Auto-created loan for fulfilled hold ${request.request_id}`);
+        } catch (loanError) {
+          console.error('Auto loan creation failed:', loanError);
+        }
+      }
     }
 
     // Query the appropriate table based on item type
@@ -182,6 +218,19 @@ router.post('/', asyncHandler(async (req, res) => {
     });
   }
 
+  // Check if member already has this item checked out
+  const [existingLoan] = await db.query(
+    'SELECT loan_id FROM loan WHERE member_id = ? AND item_id = ? AND item_type = ? AND return_ts IS NULL',
+    [member_id, actualItemId, itemType]
+  );
+
+  if (existingLoan.length > 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Cannot place a hold request on an item you already have checked out.'
+    });
+  }
+
   // Check if member can make hold request (loan limits and fines)
   const canMakeRequest = await priorityQueueService.canMemberMakeHoldRequest(member_id);
   if (!canMakeRequest) {
@@ -241,7 +290,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
 
   // Check if request exists
   const [requests] = await db.query(
-    'SELECT request_id, status, item_id, queue_position FROM hold_requests WHERE request_id = ?',
+    'SELECT hr.request_id, hr.status, hr.item_id, hr.queue_position, hr.member_id FROM hold_requests hr WHERE hr.request_id = ?',
     [id]
   );
 
@@ -261,24 +310,75 @@ router.put('/:id', asyncHandler(async (req, res) => {
     });
   }
 
-  // Update status - handle trigger conflicts gracefully
-  try {
-    await db.query(
-      'UPDATE hold_requests SET status = ? WHERE request_id = ?',
-      [status, id]
-    );
-  } catch (triggerError) {
-    if (triggerError.code === 'ER_CANT_UPDATE_USED_TABLE_IN_SF_OR_TRG') {
-      // Trigger conflict - provide helpful error message
-      return res.status(500).json({
-        success: false,
-        message: 'Database trigger conflict occurred. Please contact library staff to cancel this hold request manually.',
-        error: 'TRIGGER_CONFLICT'
-      });
+  // If fulfilling a hold, automatically create a loan for the member
+  if (status === 'fulfilled') {
+    // Parse composite ID to get actual item details
+    const compositeId = request.item_id;
+    let actualItemId, itemType, branchId = 1; // Default branch
+
+    if (compositeId >= 4000000) {
+      itemType = 'electronic_rental';
+      actualItemId = compositeId - 4000000;
+      // Get branch_id from electronics table
+      const [branchResult] = await db.query('SELECT branch_id FROM electronics WHERE libra_id = ?', [actualItemId]);
+      if (branchResult.length > 0) branchId = branchResult[0].branch_id;
+    } else if (compositeId >= 3000000) {
+      itemType = 'article';
+      actualItemId = compositeId - 3000000;
+      // Get branch_id from articles table
+      const [branchResult] = await db.query('SELECT branch_id FROM articles WHERE artic_id = ?', [actualItemId]);
+      if (branchResult.length > 0) branchId = branchResult[0].branch_id;
+    } else if (compositeId >= 2000000) {
+      itemType = 'movie';
+      actualItemId = compositeId - 2000000;
+      // Get branch_id from movies table
+      const [branchResult] = await db.query('SELECT branch_id FROM movies WHERE movie_id = ?', [actualItemId]);
+      if (branchResult.length > 0) branchId = branchResult[0].branch_id;
+    } else if (compositeId >= 1000000) {
+      itemType = 'book';
+      actualItemId = compositeId - 1000000;
+      // Get branch_id from books table
+      const [branchResult] = await db.query('SELECT branch_id FROM books WHERE book_id = ?', [actualItemId]);
+      if (branchResult.length > 0) branchId = branchResult[0].branch_id;
     } else {
-      throw triggerError;
+      itemType = 'book';
+      actualItemId = compositeId;
+      // Get branch_id from books table
+      const [branchResult] = await db.query('SELECT branch_id FROM books WHERE book_id = ?', [actualItemId]);
+      if (branchResult.length > 0) branchId = branchResult[0].branch_id;
+    }
+
+    // Create the loan automatically
+    try {
+      const [loanResult] = await db.query(
+        `INSERT INTO loan (item_id, item_type, member_id, loan_date, due_date, branch_id)
+         VALUES (?, ?, ?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 14 DAY), ?)`,
+        [actualItemId, itemType, request.member_id, branchId]
+      );
+
+      console.log('Loan created successfully:', {
+        loan_id: loanResult.insertId,
+        item_id: actualItemId,
+        item_type: itemType,
+        member_id: request.member_id,
+        branch_id: branchId
+      });
+
+    } catch (loanError) {
+      console.error('Loan creation failed:', loanError);
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot fulfill hold: member may already have this item or loan limits exceeded.',
+        error: loanError.message
+      });
     }
   }
+
+  // Update status
+  await db.query(
+    'UPDATE hold_requests SET status = ? WHERE request_id = ?',
+    [status, id]
+  );
 
   // If fulfilled, update queue using service
   if (status === 'fulfilled') {

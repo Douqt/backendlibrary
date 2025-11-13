@@ -1,15 +1,7 @@
 import { useState } from 'react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Card, CardContent } from './ui/card';
 import { UserCog } from 'lucide-react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
 
 // import { API_URL } from '../config/api';
 // const API_BASE_URL = API_URL;

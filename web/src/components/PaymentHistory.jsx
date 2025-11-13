@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { X, Receipt, CreditCard } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
-const PaymentHistory = ({ onClose }) => {
+const PaymentHistory = ({ onClose, user }) => {
+  const navigate = useNavigate();
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -10,6 +12,14 @@ const PaymentHistory = ({ onClose }) => {
   useEffect(() => {
     fetchPaymentHistory();
   }, []);
+
+  const handleClose = () => {
+    if (onClose) {
+      onClose();
+    } else {
+      navigate(-1); // Go back to previous page
+    }
+  };
 
   const fetchPaymentHistory = async () => {
     try {
@@ -66,7 +76,7 @@ const PaymentHistory = ({ onClose }) => {
             Payment History
           </h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
           >
             <X className="h-6 w-6" />
@@ -160,8 +170,8 @@ const PaymentHistory = ({ onClose }) => {
         {/* Footer */}
         <div className="p-6 border-t bg-gray-50">
           <button
-            onClick={onClose}
-            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            onClick={handleClose}
+            className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
           >
             Close
           </button>

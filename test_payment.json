@@ -1,0 +1,8 @@
+{
+  "fine_id": 1,
+  "card_number": "4111111111111111",
+  "expiry_month": "12",
+  "expiry_year": "2025",
+  "cvv": "123",
+  "cardholder_name": "Test User"
+}

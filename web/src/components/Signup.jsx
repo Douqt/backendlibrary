@@ -8,7 +8,6 @@ const Signup = () => {
   const [formData, setFormData] = useState({
     member_name: '',
     member_email: '',
-    member_type: 'local', // Default to local member
     username: '',
     password: '',
     join_date: new Date().toISOString().split('T')[0] // Today's date
@@ -131,6 +130,7 @@ const Signup = () => {
                 placeholder="Create a password"
               />
             </div>
+
 
 
           </div>

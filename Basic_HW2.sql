@@ -18,6 +18,9 @@ DROP TRIGGER IF EXISTS loan_overdue_fine;
 DROP TRIGGER IF EXISTS loan_overdue_fine_update;
 DROP TRIGGER IF EXISTS hold_auto_expire;
 DROP TRIGGER IF EXISTS hold_fulfill_on_book_available;
+DROP TRIGGER IF EXISTS hold_fulfill_on_movie_available;
+DROP TRIGGER IF EXISTS hold_fulfill_on_article_available;
+DROP TRIGGER IF EXISTS hold_fulfill_on_electronic_available;
 DROP TRIGGER IF EXISTS hold_queue_reorder;
 DROP TRIGGER IF EXISTS reservation_time_status;
 DROP TRIGGER IF EXISTS reservation_overlap;
@@ -482,25 +485,70 @@ BEGIN
   DECLARE curr_loans INT DEFAULT 0;
   DECLARE max_loans INT DEFAULT 0;
   DECLARE mtype VARCHAR(16);
+  DECLARE already_checked_out INT DEFAULT 0;
+  DECLARE has_fulfilled_hold INT DEFAULT 0;
 
   IF NEW.member_id IS NULL THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Loan must have a member.';
   END IF;
 
-  SELECT COUNT(*) INTO fine_count FROM fines WHERE member_id = NEW.member_id AND payment_status <> 'paid';
-  SELECT COUNT(*) INTO curr_loans FROM loan WHERE member_id = NEW.member_id AND return_ts IS NULL;
-  SELECT member_type INTO mtype FROM member WHERE member_id = NEW.member_id;
+  -- Check if member already has this item checked out
+  SELECT COUNT(*) INTO already_checked_out
+  FROM loan
+  WHERE member_id = NEW.member_id
+    AND item_id = NEW.item_id
+    AND item_type = NEW.item_type
+    AND return_ts IS NULL;
 
-  IF mtype = 'student' THEN
-    SET max_loans = 5;
-  ELSEIF mtype = 'faculty' THEN
-    SET max_loans = 10;
-  ELSE
-    SET max_loans = 3;
+  IF already_checked_out > 0 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cannot check out the same item twice. You already have this item checked out.';
   END IF;
 
-  IF fine_count > 0 OR curr_loans >= max_loans THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cannot create new loan: fines unpaid or limit reached.';
+  -- Check if this loan is for a fulfilled hold (allow even if limits exceeded)
+  CASE NEW.item_type
+    WHEN 'book' THEN
+      SELECT COUNT(*) INTO has_fulfilled_hold
+      FROM hold_requests
+      WHERE member_id = NEW.member_id
+        AND item_id = (1000000 + NEW.item_id)
+        AND status = 'fulfilled';
+    WHEN 'movie' THEN
+      SELECT COUNT(*) INTO has_fulfilled_hold
+      FROM hold_requests
+      WHERE member_id = NEW.member_id
+        AND item_id = (2000000 + NEW.item_id)
+        AND status = 'fulfilled';
+    WHEN 'article' THEN
+      SELECT COUNT(*) INTO has_fulfilled_hold
+      FROM hold_requests
+      WHERE member_id = NEW.member_id
+        AND item_id = (3000000 + NEW.item_id)
+        AND status = 'fulfilled';
+    WHEN 'electronic_rental' THEN
+      SELECT COUNT(*) INTO has_fulfilled_hold
+      FROM hold_requests
+      WHERE member_id = NEW.member_id
+        AND item_id = (4000000 + NEW.item_id)
+        AND status = 'fulfilled';
+  END CASE;
+
+  -- If this is for a fulfilled hold, skip the limit checks
+  IF has_fulfilled_hold = 0 THEN
+    SELECT COUNT(*) INTO fine_count FROM fines WHERE member_id = NEW.member_id AND payment_status <> 'paid';
+    SELECT COUNT(*) INTO curr_loans FROM loan WHERE member_id = NEW.member_id AND return_ts IS NULL;
+    SELECT member_type INTO mtype FROM member WHERE member_id = NEW.member_id;
+
+    IF mtype = 'student' THEN
+      SET max_loans = 5;
+    ELSEIF mtype = 'faculty' THEN
+      SET max_loans = 10;
+    ELSE
+      SET max_loans = 3;
+    END IF;
+
+    IF fine_count > 0 OR curr_loans >= max_loans THEN
+      SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cannot create new loan: fines unpaid or limit reached.';
+    END IF;
   END IF;
 END$$
 
@@ -570,7 +618,55 @@ BEGIN
   IF NEW.available = TRUE AND OLD.available <> NEW.available THEN
     SELECT request_id INTO oldest_request
     FROM hold_requests
-    WHERE item_id = NEW.book_id AND status = 'pending'
+    WHERE item_id = (1000000 + NEW.book_id) AND status = 'pending'
+    ORDER BY request_date ASC
+    LIMIT 1;
+    IF oldest_request IS NOT NULL THEN
+      UPDATE hold_requests SET status = 'fulfilled' WHERE request_id = oldest_request;
+    END IF;
+  END IF;
+END$$
+
+CREATE TRIGGER hold_fulfill_on_movie_available AFTER UPDATE ON movies
+FOR EACH ROW
+BEGIN
+  DECLARE oldest_request INT;
+  IF NEW.available = TRUE AND OLD.available <> NEW.available THEN
+    SELECT request_id INTO oldest_request
+    FROM hold_requests
+    WHERE item_id = (2000000 + NEW.movie_id) AND status = 'pending'
+    ORDER BY request_date ASC
+    LIMIT 1;
+    IF oldest_request IS NOT NULL THEN
+      UPDATE hold_requests SET status = 'fulfilled' WHERE request_id = oldest_request;
+    END IF;
+  END IF;
+END$$
+
+CREATE TRIGGER hold_fulfill_on_article_available AFTER UPDATE ON articles
+FOR EACH ROW
+BEGIN
+  DECLARE oldest_request INT;
+  IF NEW.available = TRUE AND OLD.available <> NEW.available THEN
+    SELECT request_id INTO oldest_request
+    FROM hold_requests
+    WHERE item_id = (3000000 + NEW.artic_id) AND status = 'pending'
+    ORDER BY request_date ASC
+    LIMIT 1;
+    IF oldest_request IS NOT NULL THEN
+      UPDATE hold_requests SET status = 'fulfilled' WHERE request_id = oldest_request;
+    END IF;
+  END IF;
+END$$
+
+CREATE TRIGGER hold_fulfill_on_electronic_available AFTER UPDATE ON electronics
+FOR EACH ROW
+BEGIN
+  DECLARE oldest_request INT;
+  IF NEW.available = TRUE AND OLD.available <> NEW.available THEN
+    SELECT request_id INTO oldest_request
+    FROM hold_requests
+    WHERE item_id = (4000000 + NEW.libra_id) AND status = 'pending'
     ORDER BY request_date ASC
     LIMIT 1;
     IF oldest_request IS NOT NULL THEN
@@ -661,7 +757,7 @@ END$$
 CREATE TRIGGER item_hold_block BEFORE UPDATE ON books
 FOR EACH ROW
 BEGIN
-  IF NEW.available = TRUE AND EXISTS (SELECT 1 FROM hold_requests WHERE item_id = NEW.book_id AND status = 'pending') THEN
+  IF NEW.available = TRUE AND EXISTS (SELECT 1 FROM hold_requests WHERE item_id = (1000000 + NEW.book_id) AND status = 'pending') THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Item has pending holds; cannot mark as available unless fulfilling hold.';
   END IF;
 END$$
@@ -669,14 +765,20 @@ END$$
 CREATE TRIGGER item_delete_cancel_holds BEFORE DELETE ON books
 FOR EACH ROW
 BEGIN
-  UPDATE hold_requests SET status = 'canceled' WHERE item_id = OLD.book_id AND status = 'pending';
+  UPDATE hold_requests SET status = 'canceled' WHERE item_id = (1000000 + OLD.book_id) AND status = 'pending';
 END$$
 
 CREATE TRIGGER loan_on_create AFTER INSERT ON loan
 FOR EACH ROW
 BEGIN
   IF NEW.item_type = 'book' THEN
-    UPDATE books SET copies = copies - 1, available = (copies - 1 > 0) WHERE book_id = NEW.item_id;
+    UPDATE books SET copies = copies - 1 WHERE book_id = NEW.item_id;
+  ELSEIF NEW.item_type = 'movie' THEN
+    UPDATE movies SET copy_amount = copy_amount - 1 WHERE movie_id = NEW.item_id;
+  ELSEIF NEW.item_type = 'article' THEN
+    UPDATE articles SET copies = copies - 1 WHERE artic_id = NEW.item_id;
+  ELSEIF NEW.item_type = 'electronic_rental' THEN
+    UPDATE electronics SET copy_amount = copy_amount - 1 WHERE libra_id = NEW.item_id;
   END IF;
 END$$
 
@@ -684,14 +786,36 @@ CREATE TRIGGER loan_on_return AFTER UPDATE ON loan
 FOR EACH ROW
 BEGIN
   IF NEW.return_ts IS NOT NULL AND (OLD.return_ts IS NULL OR OLD.return_ts <> NEW.return_ts) THEN
+    -- Increment copies first
     IF NEW.item_type = 'book' THEN
-      -- Check if there are pending holds for this item
-      IF EXISTS (SELECT 1 FROM hold_requests WHERE item_id = NEW.item_id AND status = 'pending') THEN
-        -- Item has pending holds, increment copies but keep available = FALSE
-        UPDATE books SET copies = copies + 1, available = FALSE WHERE book_id = NEW.item_id;
-      ELSE
-        -- No pending holds, mark as available
-        UPDATE books SET copies = copies + 1, available = TRUE WHERE book_id = NEW.item_id;
+      UPDATE books SET copies = copies + 1 WHERE book_id = NEW.item_id;
+    ELSEIF NEW.item_type = 'movie' THEN
+      UPDATE movies SET copy_amount = copy_amount + 1 WHERE movie_id = NEW.item_id;
+    ELSEIF NEW.item_type = 'article' THEN
+      UPDATE articles SET copies = copies + 1 WHERE artic_id = NEW.item_id;
+    ELSEIF NEW.item_type = 'electronic_rental' THEN
+      UPDATE electronics SET copy_amount = copy_amount + 1 WHERE libra_id = NEW.item_id;
+    END IF;
+
+    -- Check if there are pending holds and fulfill the oldest one
+    CALL fulfill_hold_and_create_loan(NEW.item_id, NEW.item_type, NEW.branch_id);
+
+    -- If no holds were fulfilled, make the item available
+    IF NEW.item_type = 'book' THEN
+      IF NOT EXISTS (SELECT 1 FROM hold_requests WHERE item_id = (1000000 + NEW.item_id) AND status = 'pending') THEN
+        UPDATE books SET available = TRUE WHERE book_id = NEW.item_id;
+      END IF;
+    ELSEIF NEW.item_type = 'movie' THEN
+      IF NOT EXISTS (SELECT 1 FROM hold_requests WHERE item_id = (2000000 + NEW.item_id) AND status = 'pending') THEN
+        UPDATE movies SET available = TRUE WHERE movie_id = NEW.item_id;
+      END IF;
+    ELSEIF NEW.item_type = 'article' THEN
+      IF NOT EXISTS (SELECT 1 FROM hold_requests WHERE item_id = (3000000 + NEW.item_id) AND status = 'pending') THEN
+        UPDATE articles SET available = TRUE WHERE artic_id = NEW.item_id;
+      END IF;
+    ELSEIF NEW.item_type = 'electronic_rental' THEN
+      IF NOT EXISTS (SELECT 1 FROM hold_requests WHERE item_id = (4000000 + NEW.item_id) AND status = 'pending') THEN
+        UPDATE electronics SET available = TRUE WHERE libra_id = NEW.item_id;
       END IF;
     END IF;
   END IF;
@@ -929,6 +1053,34 @@ BEGIN
   END IF;
 
   DELETE FROM item_copy WHERE copy_id = p_copy_id;
+END$$
+
+DROP PROCEDURE IF EXISTS fulfill_hold_and_create_loan$$
+CREATE PROCEDURE fulfill_hold_and_create_loan(IN p_item_id INT, IN p_item_type VARCHAR(20), IN p_branch_id INT)
+BEGIN
+  DECLARE hold_request_id INT;
+  DECLARE member_id_val INT;
+  DECLARE composite_id INT;
+
+  -- Calculate composite ID
+  CASE p_item_type
+    WHEN 'book' THEN SET composite_id = 1000000 + p_item_id;
+    WHEN 'movie' THEN SET composite_id = 2000000 + p_item_id;
+    WHEN 'article' THEN SET composite_id = 3000000 + p_item_id;
+    WHEN 'electronic_rental' THEN SET composite_id = 4000000 + p_item_id;
+  END CASE;
+
+  -- Find the oldest pending hold
+  SELECT request_id, member_id INTO hold_request_id, member_id_val
+  FROM hold_requests
+  WHERE item_id = composite_id AND status = 'pending'
+  ORDER BY request_date ASC
+  LIMIT 1;
+
+  -- If we found a hold, just fulfill it (loan creation will be handled by application)
+  IF hold_request_id IS NOT NULL THEN
+    UPDATE hold_requests SET status = 'fulfilled' WHERE request_id = hold_request_id;
+  END IF;
 END$$
 
 DROP PROCEDURE IF EXISTS admin_delete_item_title$$

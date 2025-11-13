@@ -16,7 +16,8 @@ const Profile = ({ user }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
-    email: ''
+    email: '',
+    member_type: ''
   });
 
 
@@ -40,7 +41,8 @@ const Profile = ({ user }) => {
         setProfileData(data.data);
         setEditForm({
           name: data.data.member_name,
-          email: data.data.member_email
+          email: data.data.member_email,
+          member_type: data.data.member_type
         });
       } else {
         const errorData = await response.json();
@@ -54,6 +56,11 @@ const Profile = ({ user }) => {
     }
   };
 
+  const isStaff = () => {
+    const userData = JSON.parse(localStorage.getItem('user') || '{}');
+    return userData.user_type === 'staff';
+  };
+
   const handleEdit = () => {
     setIsEditing(true);
   };
@@ -62,7 +69,8 @@ const Profile = ({ user }) => {
     setIsEditing(false);
     setEditForm({
       name: profileData.member_name,
-      email: profileData.member_email
+      email: profileData.member_email,
+      member_type: profileData.member_type
     });
   };
 
@@ -75,10 +83,16 @@ const Profile = ({ user }) => {
         'x-user-id': userData.user_type === 'member' ? userData.member_id : userData.staff_id
       };
 
+      const updateData = {
+        member_name: editForm.name,
+        member_email: editForm.email,
+        member_type: editForm.member_type
+      };
+
       const response = await fetch(`${API_BASE_URL}/members/${userData.member_id}`, {
         method: 'PUT',
         headers,
-        body: JSON.stringify(editForm)
+        body: JSON.stringify(updateData)
       });
 
       if (response.ok) {
@@ -149,7 +163,7 @@ const Profile = ({ user }) => {
                         name="name"
                         value={editForm.name}
                         onChange={handleChange}
-                        className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                        className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white text-gray-900"
                       />
                     ) : (
                       <p className="text-foreground">{profileData.member_name}</p>
@@ -164,7 +178,7 @@ const Profile = ({ user }) => {
                         name="email"
                         value={editForm.email}
                         onChange={handleChange}
-                        className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                        className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white text-gray-900"
                       />
                     ) : (
                       <p className="text-foreground">{profileData.member_email}</p>
@@ -173,7 +187,20 @@ const Profile = ({ user }) => {
 
                   <div>
                     <label className="block text-sm font-medium text-muted-foreground mb-1">Member Type</label>
-                    <p className="text-foreground capitalize">{profileData.member_type}</p>
+                    {isEditing && isStaff() ? (
+                      <select
+                        name="member_type"
+                        value={editForm.member_type}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white text-gray-900"
+                      >
+                        <option value="local">Local</option>
+                        <option value="student">Student</option>
+                        <option value="faculty">Faculty</option>
+                      </select>
+                    ) : (
+                      <p className="text-foreground capitalize">{profileData.member_type}</p>
+                    )}
                   </div>
 
                   <div>
