@@ -13,9 +13,7 @@ import {
 
 // import { API_URL } from '../config/api';
 // const API_BASE_URL = API_URL;
-const API_BASE_URL = API_URL;
-// for fetching/updating the currently logged-in user's info.
-const USER_INFO_ENDPOINT = `${API_BASE_URL}/api/users/me`;
+const API_BASE_URL = '';
 
 const AdminSUMM_Report = () => {
   const [reportType, setReportType] = useState('biweekly'); // default report
