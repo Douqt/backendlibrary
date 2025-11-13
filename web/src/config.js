@@ -1,6 +1,4 @@
 // API Configuration
-// Change this URL to switch between localhost and production
-// export const API_BASE_URL = 'http://localhost:5000/api';
-
-// For production VM, use:
-export const API_BASE_URL = 'https://librarydb.duckdns.org/api';
+// Uses VITE_API_URL from .env.local for local development
+// Falls back to production URL if not set
+export const API_BASE_URL = `${import.meta.env.VITE_API_URL || 'https://librarydb.duckdns.org'}/api`;

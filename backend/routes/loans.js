@@ -302,28 +302,28 @@ router.post('/', asyncHandler(async (req, res) => {
   const loanId = result.insertId;
 
   // Get item details and branch name for notification
-  let itemTitle = `${item_type} #${item_id}`;
+  let itemTitle = `${finalItemType} #${actualItemId}`;
   let branchName = 'Library';
 
   try {
     // Get item title based on type
-    if (item_type === 'book') {
-      const [bookDetails] = await db.query('SELECT title FROM books WHERE book_id = ?', [item_id]);
+    if (finalItemType === 'book') {
+      const [bookDetails] = await db.query('SELECT title FROM books WHERE book_id = ?', [actualItemId]);
       if (bookDetails.length > 0) {
         itemTitle = bookDetails[0].title;
       }
-    } else if (item_type === 'movie') {
-      const [movieDetails] = await db.query('SELECT title FROM movies WHERE movie_id = ?', [item_id]);
+    } else if (finalItemType === 'movie') {
+      const [movieDetails] = await db.query('SELECT title FROM movies WHERE movie_id = ?', [actualItemId]);
       if (movieDetails.length > 0) {
         itemTitle = movieDetails[0].title;
       }
-    } else if (item_type === 'article') {
-      const [articleDetails] = await db.query('SELECT title FROM articles WHERE artic_id = ?', [item_id]);
+    } else if (finalItemType === 'article') {
+      const [articleDetails] = await db.query('SELECT title FROM articles WHERE artic_id = ?', [actualItemId]);
       if (articleDetails.length > 0) {
         itemTitle = articleDetails[0].title;
       }
-    } else if (item_type === 'electronic_rental') {
-      const [electronicDetails] = await db.query('SELECT device_name as title FROM electronics WHERE libra_id = ?', [item_id]);
+    } else if (finalItemType === 'electronic_rental') {
+      const [electronicDetails] = await db.query('SELECT device_name as title FROM electronics WHERE libra_id = ?', [actualItemId]);
       if (electronicDetails.length > 0) {
         itemTitle = electronicDetails[0].title;
       }
