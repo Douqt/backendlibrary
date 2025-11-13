@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, CreditCard, Loader2, CheckCircle2 } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 const PaymentModal = ({ fine, onClose, onSuccess, notificationRef }) => {
   const [step, setStep] = useState(1); // 1: Form, 2: Processing, 3: Confirmation
@@ -38,7 +39,7 @@ const PaymentModal = ({ fine, onClose, onSuccess, notificationRef }) => {
     } else if (name === 'expirationDate') {
       formattedValue = formatExpirationDate(value);
     } else if (name === 'cvv') {
-      formattedValue = value.replace(/\D/g, '').slice(0, 4);
+      formattedValue = value.replace(/\D/g, '').slice(0, 3);
     }
 
     setFormData({ ...formData, [name]: formattedValue });
@@ -80,8 +81,8 @@ const PaymentModal = ({ fine, onClose, onSuccess, notificationRef }) => {
     // Validate CVV
     if (!formData.cvv) {
       newErrors.cvv = 'CVV is required';
-    } else if (formData.cvv.length < 3) {
-      newErrors.cvv = 'CVV must be 3-4 digits';
+    } else if (formData.cvv.length !== 3) {
+      newErrors.cvv = 'CVV must be exactly 3 digits';
     }
 
     // Validate cardholder name
@@ -108,9 +109,8 @@ const PaymentModal = ({ fine, onClose, onSuccess, notificationRef }) => {
       await new Promise(resolve => setTimeout(resolve, 2500));
 
       // Call backend API
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const user = JSON.parse(localStorage.getItem('user'));
-      const response = await fetch(`${API_URL}/api/payments`, {
+      const response = await fetch(`${API_BASE_URL}/payments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
