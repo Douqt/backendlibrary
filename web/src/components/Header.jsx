@@ -139,7 +139,7 @@ const Header = ({ user, onSignIn, onLogout }) => {
                   Payments
                 </NavLink>
               )}
-              {user.user_type === 'staff' && (
+              {user.user_type === 'staff' && (user.role === 'admin' || user.position === 'admin') && (
                 <NavLink
                   to="/reports"
                   className={({ isActive }) =>

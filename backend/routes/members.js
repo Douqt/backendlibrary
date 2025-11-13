@@ -9,7 +9,7 @@ router.get('/', asyncHandler(async(req, res) => {
     const [members] = await db.query(`
         SELECT member_id, member_name, member_email, member_type, join_date, close_date, status, num_loans, date_last_checked_out
         FROM member
-        WHERE close_date = '9999-01-01'
+        WHERE close_date = '9999-01-01' AND deleted_at IS NULL
         ORDER BY join_date DESC
     `);
 
@@ -27,7 +27,7 @@ router.get('/:id', asyncHandler(async(req, res) => {
     const[members] = await db.query(`
         SELECT member_id, member_name, member_email, member_type, join_date, close_date, status, num_loans, date_last_checked_out
         FROM member
-        WHERE member_id = ? AND close_date = '9999-01-01'
+        WHERE member_id = ? AND close_date = '9999-01-01' AND deleted_at IS NULL
     `, [id]);
 
     if (members.length === 0){
@@ -179,6 +179,48 @@ router.put('/:id', asyncHandler(async(req, res) => {
             member_type,
             status: newStatus
         }
+    });
+}));
+
+//PATCH /api/members/:id/soft-delete - soft delete a member
+router.patch('/:id/soft-delete', asyncHandler(async (req, res) => {
+    const { id } = req.params;
+
+    // Check if member exists and is not already soft deleted
+    const [existingMember] = await db.query(
+        'SELECT member_id, deleted_at FROM member WHERE member_id = ? AND deleted_at IS NULL',
+        [id]
+    );
+
+    if (existingMember.length === 0) {
+        return res.status(404).json({
+            success: false,
+            message: 'Member not found or already deleted'
+        });
+    }
+
+    // Check for active loans
+    const [activeLoans] = await db.query(
+        'SELECT COUNT(*) as loan_count FROM loan WHERE member_id = ? AND return_ts IS NULL AND deleted_at IS NULL',
+        [id]
+    );
+
+    if (activeLoans[0].loan_count > 0) {
+        return res.status(400).json({
+            success: false,
+            message: 'Cannot soft delete member with active loans'
+        });
+    }
+
+    // Soft delete by setting deleted_at to current timestamp
+    await db.query(
+        'UPDATE member SET deleted_at = CURRENT_TIMESTAMP WHERE member_id = ?',
+        [id]
+    );
+
+    res.json({
+        success: true,
+        message: 'Member soft deleted successfully'
     });
 }));
 

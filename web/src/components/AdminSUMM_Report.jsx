@@ -6,7 +6,7 @@ import { UserCog } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
 const AdminSUMM_Report = () => {
-  const [reportType, setReportType] = useState('biweekly'); // default report
+  const [reportType, setReportType] = useState('overdueLoans'); // default report
   const [chartData, setChartData] = useState([]);
   const [tableData, setTableData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -24,58 +24,54 @@ const AdminSUMM_Report = () => {
       let transform = (json) => ({ data: [], xKey: '', series: [] });
 
       switch (reportType) {
-        case 'biweekly':
-          endpoint = `${API_BASE_URL}/admin/report/summary`; // your original route
+        case 'overdueLoans':
+          endpoint = `${API_BASE_URL}/admin/report/overdue-loans`;
           transform = (json) => {
             if (!json?.success) throw new Error(json?.message || 'Failed to load report');
-
-            // Aggregate total loans per bi-week (all members combined), preserving your logic
-            const byPeriod = {};
-            json.data.biweekly.forEach((row) => {
-              const key = row.biweek_label;
-              if (!byPeriod[key]) byPeriod[key] = { biweek_label: key, loans_in_period: 0 };
-              byPeriod[key].loans_in_period += row.loans_in_period;
-            });
-
             return {
-              data: Object.values(byPeriod),
-              tableData: json.data.biweekly,
-              xKey: 'biweek_label',
-              series: [{ key: 'loans_in_period', label: 'Loans' }],
-            };
-          };
-          break;
-
-        case 'topBorrowers':
-          endpoint = `${API_BASE_URL}/admin/report/top-borrowers`; // e.g., SELECT member_name, total_loans
-          transform = (json) => {
-            if (!json?.success) throw new Error(json?.message || 'Failed to load report');
-            // Expect rows like { member_name, total_loans }
-            return {
-              data: json.data.rows || [],
-              xKey: 'member_name',
-              series: [{ key: 'total_loans', label: 'Total Loans' }],
-            };
-          };
-          break;
-
-        case 'finesAccrued':
-          endpoint = `${API_BASE_URL}/admin/report/fines-accrued`; // e.g., SELECT member_name, total_fines_amount, total_fines_paid
-          transform = (json) => {
-            if (!json?.success) throw new Error(json?.message || 'Failed to load report');
-            // Expect rows like { member_name, total_fines_amount, total_fines_paid }
-            return {
-              data: json.data.rows || [],
+              data: json.data || [],
+              tableData: json.data || [],
               xKey: 'member_name',
               series: [
-                { key: 'total_fines_amount', label: 'Fines Accrued' },
-                { key: 'total_fines_paid', label: 'Fines Paid' },
+                { key: 'days_overdue', label: 'Days Overdue' },
+                { key: 'fine_amount', label: 'Fine Amount ($)' }
               ],
             };
           };
           break;
 
+        case 'mostBorrowed':
+          endpoint = `${API_BASE_URL}/admin/report/most-borrowed`;
+          transform = (json) => {
+            if (!json?.success) throw new Error(json?.message || 'Failed to load report');
+            return {
+              data: json.data || [],
+              tableData: json.data || [],
+              xKey: 'item_title',
+              series: [
+                { key: 'times_borrowed', label: 'Times Borrowed' },
+                { key: 'unique_borrowers', label: 'Unique Borrowers' }
+              ],
+            };
+          };
+          break;
 
+        case 'memberActivity':
+          endpoint = `${API_BASE_URL}/admin/report/member-activity`;
+          transform = (json) => {
+            if (!json?.success) throw new Error(json?.message || 'Failed to load report');
+            return {
+              data: json.data || [],
+              tableData: json.data || [],
+              xKey: 'member_name',
+              series: [
+                { key: 'total_loans', label: 'Total Loans' },
+                { key: 'active_loans', label: 'Active Loans' },
+                { key: 'total_fines_owed', label: 'Fines Owed ($)' }
+              ],
+            };
+          };
+          break;
 
         default:
           throw new Error('Unknown report type');
@@ -133,9 +129,9 @@ const AdminSUMM_Report = () => {
                   className="px-3 py-2 rounded-xl border border-input bg-white text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   aria-label="Select report type"
                 >
-                  <option value="biweekly">Bi-weekly Loans (All Members)</option>
-                  <option value="topBorrowers">Top Borrowers</option>
-                  <option value="finesAccrued">Fines Accrued vs Paid</option>
+                  <option value="overdueLoans">Overdue Loans with Member Info & Fines</option>
+                  <option value="mostBorrowed">Most Borrowed Items by Type</option>
+                  <option value="memberActivity">Member Loan & Fine Summary</option>
                 </select>
 
                 <button

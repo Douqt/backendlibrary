@@ -183,5 +183,60 @@ router.get(
   })
 );
 
-module.exports = router;
+// =====================================================
+// NEW REPORTS: Overdue Loans with Member Info & Fines
+// =====================================================
+router.get(
+  '/overdue-loans',
+  asyncHandler(async (req, res) => {
+    const [rows] = await db.query(`
+      SELECT * FROM overdue_loans_report
+      ORDER BY days_overdue DESC, member_name ASC
+    `);
+    res.status(200).json({
+      success: true,
+      message: 'Overdue loans report generated successfully',
+      data: rows
+    });
+  })
+);
 
+// =====================================================
+// NEW REPORTS: Most Borrowed Items by Type
+// =====================================================
+router.get(
+  '/most-borrowed',
+  asyncHandler(async (req, res) => {
+    const [rows] = await db.query(`
+      SELECT * FROM most_borrowed_items_report
+      ORDER BY item_type, times_borrowed DESC
+      LIMIT 50
+    `);
+    res.status(200).json({
+      success: true,
+      message: 'Most borrowed items report generated successfully',
+      data: rows
+    });
+  })
+);
+
+// =====================================================
+// NEW REPORTS: Member Loan and Fine Summary
+// =====================================================
+router.get(
+  '/member-activity',
+  asyncHandler(async (req, res) => {
+    const [rows] = await db.query(`
+      SELECT * FROM member_activity_report
+      ORDER BY total_loans DESC, total_fines_owed DESC
+      LIMIT 100
+    `);
+    res.status(200).json({
+      success: true,
+      message: 'Member activity report generated successfully',
+      data: rows
+    });
+  })
+);
+
+module.exports = router;

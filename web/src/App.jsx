@@ -1292,14 +1292,49 @@ function Members() {
     return (
       <div className="py-20 px-4 w-full">
         <div className="max-w-7xl mx-auto w-full">
-          <div className="mb-8 flex items-center gap-4">
-            <Button onClick={handleBackToList} variant="outline">
-              ← Back to Members
-            </Button>
-            <div>
-              <h2 className="text-4xl font-bold text-foreground">{member.member_name}</h2>
-              <p className="text-muted-foreground">{member.member_email}</p>
+          <div className="mb-8 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button onClick={handleBackToList} variant="outline">
+                ← Back to Members
+              </Button>
+              <div>
+                <h2 className="text-4xl font-bold text-foreground">{member.member_name}</h2>
+                <p className="text-muted-foreground">{member.member_email}</p>
+              </div>
             </div>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                if (window.confirm(`Are you sure you want to soft delete ${member.member_name}? This action cannot be undone.`)) {
+                  try {
+                    const userData = JSON.parse(localStorage.getItem('user'));
+                    const headers = {
+                      'x-user-type': userData.user_type,
+                      'x-user-id': userData.user_type === 'member' ? userData.member_id : userData.staff_id
+                    };
+
+                    const response = await fetch(`${API_BASE_URL}/members/${member.member_id}/soft-delete`, {
+                      method: 'PATCH',
+                      headers
+                    });
+
+                    if (response.ok) {
+                      alert('Member soft deleted successfully!');
+                      handleBackToList(); // Go back to list
+                      fetchMembers(); // Refresh the list
+                    } else {
+                      const errorData = await response.json();
+                      alert(`Soft delete failed: ${errorData.message}`);
+                    }
+                  } catch (error) {
+                    console.error('Soft delete error:', error);
+                    alert('Soft delete failed due to network error');
+                  }
+                }
+              }}
+            >
+              Soft Delete Member
+            </Button>
           </div>
 
           {detailsLoading ? (
