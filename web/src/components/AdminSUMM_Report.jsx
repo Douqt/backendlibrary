@@ -5,6 +5,9 @@ import { UserCog } from 'lucide-react';
 
 import { API_BASE_URL } from '../config';
 
+// Blue, orange, yellow
+const COLORS = ['#1d4ed8', '#f97316', '#facc15'];
+
 const AdminSUMM_Report = () => {
   const [reportType, setReportType] = useState('overdueLoans'); // default report
   const [chartData, setChartData] = useState([]);
@@ -159,9 +162,16 @@ const AdminSUMM_Report = () => {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    {chartData.series.map((s) => (
-                      <Bar key={s.key} dataKey={s.key} name={s.label} />
-                    ))}
+                    {chartData.series.map((s, i) => (
+                      <Bar
+                        key={s.key}
+                        dataKey={s.key}
+                        name={s.label}
+                        fill={COLORS[i % COLORS.length]}
+                        radius={[6, 6, 0, 0]}   // rounded top corners
+                        barSize={24}            // bar thickness
+                      />
+                     ))}
                   </BarChart>
                 </ResponsiveContainer>
               </div>
