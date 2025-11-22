@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster, toast } from 'sonner';
 import './App.css';
 import Header from './components/Header';
 import { API_BASE_URL } from './config';
@@ -62,6 +63,7 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen bg-background w-full">
+        <Toaster position="top-right" richColors closeButton />
         <Header
           user={user}
           onSignIn={openLoginModal}
@@ -595,7 +597,7 @@ function Loans({ user }) {
         });
 
         if (response.ok) {
-          alert(`"${loan.item_title}" has been returned successfully!`);
+          toast.success(`"${loan.item_title}" has been returned successfully!`);
           // Refresh loans list
           fetch(`${API_BASE_URL}/loans`, { headers })
             .then(res => res.json())
@@ -603,11 +605,11 @@ function Loans({ user }) {
             .catch(err => console.error('Error refreshing loans:', err));
         } else {
           const errorData = await response.json();
-          alert(`Return failed: ${errorData.message}`);
+          toast.error(`Return failed: ${errorData.message}`);
         }
       } catch (error) {
         console.error('Return error:', error);
-        alert('Return failed due to network error');
+        toast.error('Return failed due to network error');
       }
     };
 
@@ -765,7 +767,7 @@ function Loans({ user }) {
                 });
 
                 if (response.ok) {
-                  alert(`"${loan.item_title}" has been returned successfully!`);
+                  toast.success(`"${loan.item_title}" has been returned successfully!`);
                   // Refresh loans list
                   fetch(`${API_BASE_URL}/loans`, { headers })
                     .then(res => res.json())
@@ -773,11 +775,11 @@ function Loans({ user }) {
                     .catch(err => console.error('Error refreshing loans:', err));
                 } else {
                   const errorData = await response.json();
-                  alert(`Return failed: ${errorData.message}`);
+                  toast.error(`Return failed: ${errorData.message}`);
                 }
               } catch (error) {
                 console.error('Return error:', error);
-                alert('Return failed due to network error');
+                toast.error('Return failed due to network error');
               }
             }}
           >
@@ -1239,14 +1241,14 @@ function Members() {
           ...prev,
           member_type: newType
         }));
-        alert(`Member type updated to ${newType.charAt(0).toUpperCase() + newType.slice(1)} successfully!`);
+        toast.success(`Member type updated to ${newType.charAt(0).toUpperCase() + newType.slice(1)} successfully!`);
       } else {
         const errorData = await response.json();
-        alert(`Failed to update member type: ${errorData.message}`);
+        toast.error(`Failed to update member type: ${errorData.message}`);
       }
     } catch (error) {
       console.error('Error updating member type:', error);
-      alert('Network error occurred while updating member type');
+      toast.error('Network error occurred while updating member type');
     }
   };
 
@@ -1319,16 +1321,16 @@ function Members() {
                     });
 
                     if (response.ok) {
-                      alert('Member soft deleted successfully!');
+                      toast.success('Member soft deleted successfully!');
                       handleBackToList(); // Go back to list
                       fetchMembers(); // Refresh the list
                     } else {
                       const errorData = await response.json();
-                      alert(`Soft delete failed: ${errorData.message}`);
+                      toast.error(`Soft delete failed: ${errorData.message}`);
                     }
                   } catch (error) {
                     console.error('Soft delete error:', error);
-                    alert('Soft delete failed due to network error');
+                    toast.error('Soft delete failed due to network error');
                   }
                 }
               }}

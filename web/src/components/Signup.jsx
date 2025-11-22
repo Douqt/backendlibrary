@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { API_BASE_URL } from '../config';
 
@@ -40,7 +41,7 @@ const Signup = () => {
       const data = await response.json();
 
       if (response.ok) {
-        alert('Account created successfully! You can now log in.');
+        toast.success('Account created successfully! You can now log in.');
         navigate('/signin'); // Redirect to sign-in page
       } else {
         setError(data.message || 'Failed to create account');

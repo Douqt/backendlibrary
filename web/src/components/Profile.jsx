@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { API_BASE_URL } from '../config';
 
@@ -96,16 +97,16 @@ const Profile = ({ user }) => {
       });
 
       if (response.ok) {
-        alert('Profile updated successfully!');
+        toast.success('Profile updated successfully!');
         setIsEditing(false);
         fetchProfile(); // Refresh data
       } else {
         const error = await response.json();
-        alert(`Error: ${error.message}`);
+        toast.error(`Error: ${error.message}`);
       }
     } catch (error) {
       console.error('Error updating profile:', error);
-      alert('Error updating profile');
+      toast.error('Error updating profile');
     }
   };
 

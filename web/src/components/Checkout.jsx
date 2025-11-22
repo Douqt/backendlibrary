@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { API_BASE_URL } from '../config';
 import { Badge } from './ui/badge';
@@ -214,7 +215,7 @@ const Checkout = ({ user }) => {
 
       if (response.ok) {
         await response.json();
-        alert(`"${item.title}" has been checked out successfully!`);
+        toast.success(`"${item.title}" has been checked out successfully!`);
 
         // Update the item copies count and availability in real-time
         setAllItems(prev => prev.map(i => {
@@ -228,11 +229,11 @@ const Checkout = ({ user }) => {
         }));
       } else {
         const errorData = await response.json();
-        alert(`Checkout failed: ${errorData.message}`);
+        toast.error(`Checkout failed: ${errorData.message}`);
       }
     } catch (error) {
       console.error('Checkout error:', error);
-      alert('Checkout failed due to network error');
+      toast.error('Checkout failed due to network error');
     }
   };
 
@@ -258,14 +259,14 @@ const Checkout = ({ user }) => {
 
       if (response.ok) {
         const result = await response.json();
-        alert(`Hold request for "${item.title}" has been placed successfully! Your position in queue: ${result.data.queue_position}`);
+        toast.info(`Hold request for "${item.title}" has been placed successfully! Your position in queue: ${result.data.queue_position}`);
       } else {
         const errorData = await response.json();
-        alert(`Hold request failed: ${errorData.message}`);
+        toast.error(`Hold request failed: ${errorData.message}`);
       }
     } catch (error) {
       console.error('Hold request error:', error);
-      alert('Hold request failed due to network error');
+      toast.error('Hold request failed due to network error');
     }
   };
 

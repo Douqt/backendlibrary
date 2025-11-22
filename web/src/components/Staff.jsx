@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { API_BASE_URL } from '../config';
@@ -112,7 +113,7 @@ const Staff = () => {
       // Find the branch_id from the selected branch name
       const selectedBranch = branches.find(branch => branch.name === newStaff.branch_name);
       if (!selectedBranch) {
-        alert('Please select a valid branch');
+        toast.error('Please select a valid branch');
         return;
       }
 
@@ -137,7 +138,7 @@ const Staff = () => {
       const data = await response.json();
 
       if (response.ok) {
-        alert('Staff member created successfully!');
+        toast.success('Staff member created successfully!');
         setShowCreateForm(false);
         setNewStaff({
           name: '',
@@ -151,11 +152,11 @@ const Staff = () => {
         });
         fetchStaff(); // Refresh the list
       } else {
-        alert(`Failed to create staff member: ${data.message}`);
+        toast.error(`Failed to create staff member: ${data.message}`);
       }
     } catch (error) {
       console.error('Error creating staff:', error);
-      alert('Network error occurred while creating staff member');
+      toast.error('Network error occurred while creating staff member');
     }
   };
 
@@ -177,18 +178,18 @@ const Staff = () => {
       });
 
       if (response.ok) {
-        alert('Staff member terminated successfully!');
+        toast.success('Staff member terminated successfully!');
         fetchStaff(); // Refresh the list
         if (selectedStaff && selectedStaff.staff_id === staffId) {
           handleBackToList();
         }
       } else {
         const data = await response.json();
-        alert(`Failed to terminate staff member: ${data.message}`);
+        toast.error(`Failed to terminate staff member: ${data.message}`);
       }
     } catch (error) {
       console.error('Error terminating staff:', error);
-      alert('Network error occurred while terminating staff member');
+      toast.error('Network error occurred while terminating staff member');
     }
   };
 

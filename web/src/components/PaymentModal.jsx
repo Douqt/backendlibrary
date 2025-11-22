@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, CreditCard, Loader2, CheckCircle2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { API_BASE_URL } from '../config';
 
 const PaymentModal = ({ fine, onClose, onSuccess, notificationRef }) => {
@@ -138,7 +139,7 @@ const PaymentModal = ({ fine, onClose, onSuccess, notificationRef }) => {
       }
     } catch (error) {
       console.error('Payment error:', error);
-      alert(error.response?.data?.error || 'Payment failed. Please try again.');
+      toast.error(error.response?.data?.error || 'Payment failed. Please try again.');
       setStep(1); // Go back to form
     }
   };
