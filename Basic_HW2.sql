@@ -351,6 +351,18 @@ CREATE TABLE IF NOT EXISTS reservations (
 -- JUNCTION/RELATION TABLES
 -- ===============================
 
+CREATE TABLE IF NOT EXISTS notifications (
+  notification_id INT AUTO_INCREMENT PRIMARY KEY,
+  member_id INT NOT NULL,
+  message VARCHAR(500) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  is_read BOOLEAN DEFAULT FALSE,
+  CONSTRAINT fk_notifications_member FOREIGN KEY (member_id)
+    REFERENCES member(member_id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS book_authors (
     book_id INT,
     author_id INT,
@@ -678,10 +690,24 @@ END$$
 CREATE TRIGGER hold_queue_reorder AFTER UPDATE ON hold_requests
 FOR EACH ROW
 BEGIN
+  -- Existing queue reorder behavior
   IF NEW.status IN ('canceled','fulfilled') AND OLD.queue_position IS NOT NULL THEN
     UPDATE hold_requests
       SET queue_position = queue_position - 1
     WHERE item_id = NEW.item_id AND queue_position > OLD.queue_position;
+  END IF;
+
+  -- NEW: send notification when a hold becomes fulfilled
+  IF NEW.status = 'fulfilled' AND OLD.status <> 'fulfilled' THEN
+    INSERT INTO notifications (member_id, message)
+    VALUES (
+      NEW.member_id,
+      CONCAT(
+        'Your requested item #',
+        NEW.item_id,
+        ' is now available for pickup.'
+      )
+    );
   END IF;
 END$$
 
