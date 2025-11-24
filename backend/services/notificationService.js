@@ -10,7 +10,14 @@ const notificationMessages = {
   loan_due: (data) => `Your loan "${data.itemTitle}" is due today. Please return it to avoid late fees.`,
   loan_overdue: (data) => `OVERDUE: "${data.itemTitle}" is ${data.daysOverdue} days overdue. Current fine: $${data.currentFine}`,
   fine_paid: (data) => `Payment of $${data.amount} received. Thank you for your payment!`,
-  account_approved: (data) => `Welcome to the library! Your account has been approved. You can now start borrowing items.`
+  account_approved: (data) => `Welcome to the library! Your account has been approved. You can now start borrowing items.`,
+  member_type_change_requested: (data) => `Your request to change membership type from ${data.currentType} to ${data.requestedType} has been submitted and is pending staff review.`,
+  member_type_change_under_review: (data) => data.hasConditions
+    ? `Your membership type change request is under review. Staff have set conditions that must be met before approval.`
+    : `Your membership type change request is under review by staff.`,
+  member_type_change_conditions_set: (data) => `The conditions for your membership type change to ${data.requestedType} have been verified. Your request is ready for final approval.`,
+  member_type_change_approved: (data) => `Great news! Your membership type has been changed from ${data.oldType} to ${data.newType}. Your new benefits are now active.`,
+  member_type_change_rejected: (data) => `Your request to change membership type to ${data.requestedType} has been rejected. Reason: ${data.rejectionReason}`
 };
 
 /**
@@ -21,6 +28,7 @@ const notificationMessages = {
  * @param {Object} options.data - Data for template population
  * @param {number} options.relatedLoanId - Optional loan ID
  * @param {number} options.relatedFineId - Optional fine ID
+ * @param {number} options.relatedTypeChangeRequestId - Optional type change request ID
  * @param {boolean} options.sendEmail - Whether to send email (default: true)
  * @returns {Promise<Object>} - Created notification with email status
  */
@@ -30,12 +38,17 @@ async function createNotification({
   data,
   relatedLoanId = null,
   relatedFineId = null,
-  sendEmail: shouldSendEmail = true
+  relatedTypeChangeRequestId = null,
+  sendEmail: shouldSendEmail = true,
+  connection = null // Allow passing existing connection to reuse transaction
 }) {
-  const connection = await db.getConnection();
+  const shouldManageConnection = !connection;
+  const conn = connection || await db.getConnection();
 
   try {
-    await connection.beginTransaction();
+    if (shouldManageConnection) {
+      await conn.beginTransaction();
+    }
 
     // Generate notification message
     const messageTemplate = notificationMessages[notificationType];
@@ -45,11 +58,11 @@ async function createNotification({
     const message = messageTemplate(data);
 
     // Insert notification into database
-    const [notificationResult] = await connection.query(
+    const [notificationResult] = await conn.query(
       `INSERT INTO notifications
-       (member_id, notification_type, message, related_loan_id, related_fine_id)
-       VALUES (?, ?, ?, ?, ?)`,
-      [memberId, notificationType, message, relatedLoanId, relatedFineId]
+       (member_id, notification_type, message, related_loan_id, related_fine_id, related_type_change_request_id)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [memberId, notificationType, message, relatedLoanId, relatedFineId, relatedTypeChangeRequestId]
     );
 
     const notificationId = notificationResult.insertId;
@@ -57,7 +70,7 @@ async function createNotification({
     // Get member email if we need to send email
     let emailResult = { success: false, skipped: true };
     if (shouldSendEmail) {
-      const [members] = await connection.query(
+      const [members] = await conn.query(
         'SELECT member_email, member_name FROM member WHERE member_id = ?',
         [memberId]
       );
@@ -75,7 +88,7 @@ async function createNotification({
         emailResult = await sendEmail(memberEmail, notificationType, data);
 
         // Log email attempt
-        await connection.query(
+        await conn.query(
           `INSERT INTO notification_logs
            (notification_id, email_to, email_subject, email_body, status, error_message, attempt_count, sent_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -93,7 +106,7 @@ async function createNotification({
 
         // Update notification with email sent status
         if (emailResult.success) {
-          await connection.query(
+          await conn.query(
             'UPDATE notifications SET sent_via_email = TRUE, email_sent_at = NOW() WHERE notification_id = ?',
             [notificationId]
           );
@@ -104,7 +117,9 @@ async function createNotification({
       }
     }
 
-    await connection.commit();
+    if (shouldManageConnection) {
+      await conn.commit();
+    }
 
     console.log(`Notification created: ${notificationType} for member ${memberId}`);
 
@@ -117,11 +132,15 @@ async function createNotification({
     };
 
   } catch (error) {
-    await connection.rollback();
+    if (shouldManageConnection) {
+      await conn.rollback();
+    }
     console.error('Error creating notification:', error);
     throw error;
   } finally {
-    connection.release();
+    if (shouldManageConnection) {
+      conn.release();
+    }
   }
 }
 

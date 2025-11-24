@@ -227,12 +227,31 @@ router.post('/login', asyncHandler(async (req, res) => {
 
     // Try to find user in member_auth table first
     const [memberAuth] = await db.query(
-        'SELECT ma.username, ma.password, ma.member_id, m.member_name, m.member_email, m.member_type, m.status FROM member_auth ma JOIN member m ON ma.member_id = m.member_id WHERE ma.username = ?',
+        'SELECT ma.username, ma.password, ma.member_id, m.member_name, m.member_email, m.member_type, m.status, m.close_date, m.deleted_at FROM member_auth ma JOIN member m ON ma.member_id = m.member_id WHERE ma.username = ?',
         [username]
     );
 
     if (memberAuth.length > 0) {
         const user = memberAuth[0];
+
+        // Check if member account has been soft-deleted
+        if (user.deleted_at !== null) {
+            return res.status(403).json({
+                success: false,
+                message: 'Account has been deleted and cannot be accessed'
+            });
+        }
+
+        // Check if member account has been closed
+        const closeDateStr = user.close_date instanceof Date
+            ? user.close_date.toISOString().split('T')[0]
+            : user.close_date;
+        if (closeDateStr !== '9999-01-01') {
+            return res.status(403).json({
+                success: false,
+                message: 'Account has been closed and cannot be accessed'
+            });
+        }
 
         // Check if member is active
         if (user.status !== 'Active') {

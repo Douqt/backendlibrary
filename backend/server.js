@@ -62,10 +62,7 @@ app.use('/api/hold-requests', require('./routes/hold_requests'));
 app.use('/api/events', require('./routes/events'));
 app.use('/api/services', require('./routes/services'));
 app.use('/api/reservations', require('./routes/reservations'));
-app.use('/api/hold-requests', require('./routes/hold_requests'));
-app.use('/api/events', require('./routes/events'));
-app.use('/api/services', require('./routes/services'));
-app.use('/api/reservations', require('./routes/reservations'));
+app.use('/api/member-type-requests', require('./routes/member_type_requests'));
 
 // ===========================
 // ERROR HANDLING

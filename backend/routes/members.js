@@ -98,7 +98,7 @@ router.post('/', asyncHandler(async(req, res) => {
     });
 }));
 
-//PUT /api/members/:id -update a member 
+//PUT /api/members/:id -update a member
 router.put('/:id', asyncHandler(async(req, res) => {
     const {id} = req.params;
     const {member_name, member_email, member_type, status} = req.body;
@@ -127,9 +127,9 @@ router.put('/:id', asyncHandler(async(req, res) => {
         });
     }
 
-    //check if member exists and get current status
+    //check if member exists and get current status and type
     const [existingMember] = await db.query(
-        'SELECT member_id, status FROM member WHERE member_id = ? AND close_date = "9999-01-01"',
+        'SELECT member_id, status, member_type FROM member WHERE member_id = ? AND close_date = "9999-01-01"',
         [id]
     )
 
@@ -141,14 +141,25 @@ router.put('/:id', asyncHandler(async(req, res) => {
     }
 
     const oldStatus = existingMember[0].status;
+    const oldMemberType = existingMember[0].member_type;
     const newStatus = status || 'Active';
 
-    //update member
+    // Block direct member_type changes - must go through type change request system
+    if (oldMemberType !== member_type) {
+        return res.status(400).json({
+            success: false,
+            message: 'Direct member type changes are not allowed. Please submit a type change request at /api/member-type-requests',
+            current_type: oldMemberType,
+            requested_type: member_type
+        });
+    }
+
+    //update member (name, email, status only - NOT type)
     await db.query(`
         UPDATE member
-        SET member_name = ?, member_email = ?, member_type = ?, status = ?
+        SET member_name = ?, member_email = ?, status = ?
         WHERE member_id = ? AND close_date = '9999-01-01'
-    `, [member_name, member_email, member_type, newStatus, id]);
+    `, [member_name, member_email, newStatus, id]);
 
     // Send account approval notification if status changed from Pending to Active
     if (oldStatus === 'Pending' && newStatus === 'Active') {
@@ -176,7 +187,7 @@ router.put('/:id', asyncHandler(async(req, res) => {
             member_id: id,
             member_name,
             member_email,
-            member_type,
+            member_type: oldMemberType, // Return actual type from DB
             status: newStatus
         }
     });

@@ -1198,9 +1198,10 @@ function Members() {
     }
   };
 
-  const handleMemberClick = (member) => {
+  const handleMemberClick = async (member) => {
     setSelectedMember(member);
-    fetchMemberDetails(member.member_id);
+    await fetchMemberDetails(member.member_id);
+    await fetchTypeChangeRequests(member.member_id);
   };
 
   const handleBackToList = () => {
@@ -1208,7 +1209,43 @@ function Members() {
     setMemberDetails(null);
   };
 
-  const handleMemberTypeChange = async (memberId, newType) => {
+  // Member Type Change Request States
+  const [showTypeChangeModal, setShowTypeChangeModal] = useState(false);
+  const [typeChangeRequests, setTypeChangeRequests] = useState([]);
+  const [selectedTypeChangeRequest, setSelectedTypeChangeRequest] = useState(null);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [typeChangeForm, setTypeChangeForm] = useState({
+    requested_type: '',
+    request_reason: ''
+  });
+
+  // Fetch type change requests for member
+  const fetchTypeChangeRequests = async (memberId) => {
+    try {
+      const userData = JSON.parse(localStorage.getItem('user'));
+      const headers = {
+        'x-user-type': userData.user_type,
+        'x-user-id': userData.user_type === 'member' ? userData.member_id : userData.staff_id
+      };
+
+      const response = await fetch(
+        `${API_BASE_URL}/member-type-requests?member_id=${memberId}`,
+        { headers }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setTypeChangeRequests(data);
+        return data;
+      }
+    } catch (error) {
+      console.error('Error fetching type change requests:', error);
+    }
+    return [];
+  };
+
+  // Submit type change request
+  const handleSubmitTypeChangeRequest = async () => {
     try {
       const userData = JSON.parse(localStorage.getItem('user'));
       const headers = {
@@ -1217,38 +1254,120 @@ function Members() {
         'x-user-id': userData.user_type === 'member' ? userData.member_id : userData.staff_id
       };
 
-      const response = await fetch(`${API_BASE_URL}/members/${memberId}`, {
-        method: 'PUT',
+      const response = await fetch(`${API_BASE_URL}/member-type-requests`, {
+        method: 'POST',
         headers,
         body: JSON.stringify({
-          member_name: memberDetails.member.member_name,
-          member_email: memberDetails.member.member_email,
-          member_type: newType
+          member_id: selectedMember.member_id,
+          requested_type: typeChangeForm.requested_type,
+          request_reason: typeChangeForm.request_reason
         })
       });
 
+      const data = await response.json();
+
       if (response.ok) {
-        // Update the local state
-        setMemberDetails(prev => ({
-          ...prev,
-          member: {
-            ...prev.member,
-            member_type: newType
-          }
-        }));
-        // Also update the selected member
-        setSelectedMember(prev => ({
-          ...prev,
-          member_type: newType
-        }));
-        toast.success(`Member type updated to ${newType.charAt(0).toUpperCase() + newType.slice(1)} successfully!`);
+        toast.success('Type change request submitted successfully!');
+        setShowTypeChangeModal(false);
+        setTypeChangeForm({ requested_type: '', request_reason: '' });
+        // Refresh type change requests
+        await fetchTypeChangeRequests(selectedMember.member_id);
       } else {
-        const errorData = await response.json();
-        toast.error(`Failed to update member type: ${errorData.message}`);
+        toast.error(data.error || 'Failed to submit type change request');
       }
     } catch (error) {
-      console.error('Error updating member type:', error);
-      toast.error('Network error occurred while updating member type');
+      console.error('Error submitting type change request:', error);
+      toast.error('Network error occurred');
+    }
+  };
+
+  // Staff: Set conditions for type change request
+  const handleSetConditions = async (requestId, conditions) => {
+    try {
+      const userData = JSON.parse(localStorage.getItem('user'));
+      const headers = {
+        'Content-Type': 'application/json',
+        'x-user-type': userData.user_type,
+        'x-user-id': userData.staff_id
+      };
+
+      const response = await fetch(`${API_BASE_URL}/member-type-requests/${requestId}/set-conditions`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(conditions)
+      });
+
+      if (response.ok) {
+        toast.success('Conditions set successfully!');
+        setShowReviewModal(false);
+        await fetchTypeChangeRequests(selectedMember.member_id);
+      } else {
+        const data = await response.json();
+        toast.error(data.error || 'Failed to set conditions');
+      }
+    } catch (error) {
+      console.error('Error setting conditions:', error);
+      toast.error('Network error occurred');
+    }
+  };
+
+  // Staff: Approve type change request
+  const handleApproveTypeChange = async (requestId) => {
+    try {
+      const userData = JSON.parse(localStorage.getItem('user'));
+      const headers = {
+        'Content-Type': 'application/json',
+        'x-user-type': userData.user_type,
+        'x-user-id': userData.staff_id
+      };
+
+      const response = await fetch(`${API_BASE_URL}/member-type-requests/${requestId}/approve`, {
+        method: 'PUT',
+        headers
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success(`Type change approved! New type: ${data.new_type}`);
+        // Refresh member details and requests
+        await fetchMemberDetails(selectedMember.member_id);
+        await fetchTypeChangeRequests(selectedMember.member_id);
+      } else {
+        toast.error(data.error || 'Failed to approve type change');
+      }
+    } catch (error) {
+      console.error('Error approving type change:', error);
+      toast.error('Network error occurred');
+    }
+  };
+
+  // Staff: Reject type change request
+  const handleRejectTypeChange = async (requestId, rejectionReason) => {
+    try {
+      const userData = JSON.parse(localStorage.getItem('user'));
+      const headers = {
+        'Content-Type': 'application/json',
+        'x-user-type': userData.user_type,
+        'x-user-id': userData.staff_id
+      };
+
+      const response = await fetch(`${API_BASE_URL}/member-type-requests/${requestId}/reject`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ rejection_reason: rejectionReason })
+      });
+
+      if (response.ok) {
+        toast.success('Request rejected');
+        await fetchTypeChangeRequests(selectedMember.member_id);
+      } else {
+        const data = await response.json();
+        toast.error(data.error || 'Failed to reject request');
+      }
+    } catch (error) {
+      console.error('Error rejecting request:', error);
+      toast.error('Network error occurred');
     }
   };
 
@@ -1349,28 +1468,50 @@ function Members() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Member Type:</span>
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={member.member_type}
-                        onChange={(e) => handleMemberTypeChange(member.member_id, e.target.value)}
-                        className="px-2 py-1 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary bg-white text-gray-900"
-                        disabled={detailsLoading}
-                      >
-                        <option value="local">Local</option>
-                        <option value="student">Student</option>
-                        <option value="faculty">Faculty</option>
-                      </select>
-                      {member.member_type !== 'local' && (
-                        <Badge className={`${
-                          member.member_type === 'faculty' ? 'bg-purple-100 text-purple-800' :
-                          member.member_type === 'student' ? 'bg-blue-100 text-blue-800' :
-                          'bg-green-100 text-green-800'
-                        }`}>
-                          {member.member_type}
-                        </Badge>
-                      )}
-                    </div>
+                    <Badge className={`${
+                      member.member_type === 'faculty' ? 'bg-purple-100 text-purple-800' :
+                      member.member_type === 'student' ? 'bg-blue-100 text-blue-800' :
+                      'bg-green-100 text-green-800'
+                    }`}>
+                      {member.member_type}
+                    </Badge>
                   </div>
+                  {typeChangeRequests.length > 0 && (
+                    <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded">
+                      <div className="text-sm font-semibold text-blue-900 mb-2">Type Change Requests</div>
+                      {typeChangeRequests.map(req => (
+                        <div key={req.request_id} className="text-xs text-blue-800 mb-1 flex justify-between items-center">
+                          <span>
+                            {req.current_type} → {req.requested_type}:
+                            <Badge className={`ml-2 ${
+                              req.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              req.status === 'under_review' ? 'bg-blue-100 text-blue-800' :
+                              req.status === 'approved' ? 'bg-green-100 text-green-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {req.status}
+                            </Badge>
+                          </span>
+                          {(req.status === 'pending' || req.status === 'under_review') && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                console.log('Button clicked, request:', req);
+                                setSelectedTypeChangeRequest(req);
+                                setShowReviewModal(true);
+                                console.log('States set - showReviewModal: true, selectedRequest:', req.request_id);
+                              }}
+                            >
+                              {req.status === 'pending' ? 'Set Conditions' : 'Review'}
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Status:</span>
                     <span className={`font-medium ${member.status === 'Active' ? 'text-green-600' : 'text-red-600'}`}>
@@ -1589,6 +1730,183 @@ function Members() {
             </div>
           )}
         </div>
+
+        {/* Staff Review Modal */}
+        {showReviewModal && selectedTypeChangeRequest && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+              <h3 className="text-xl font-bold mb-4">Review Type Change Request</h3>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Member</label>
+                    <p className="text-gray-900">{selectedTypeChangeRequest.member_name}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Request Date</label>
+                    <p className="text-gray-900">{new Date(selectedTypeChangeRequest.request_date).toLocaleDateString()}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Current Type</label>
+                    <p className="text-gray-900">{selectedTypeChangeRequest.current_type}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Requested Type</label>
+                    <p className="text-gray-900 font-semibold">{selectedTypeChangeRequest.requested_type}</p>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Reason</label>
+                  <p className="text-gray-900 bg-gray-50 p-3 rounded">{selectedTypeChangeRequest.request_reason}</p>
+                </div>
+
+                {selectedTypeChangeRequest.status === 'pending' && (
+                  <div className="border-t pt-4">
+                    <h4 className="font-semibold mb-3">Set Conditions (Staff Only)</h4>
+                    <div className="space-y-2 mb-4">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="cond_overdue"
+                          className="rounded"
+                        />
+                        <span className="text-sm">Must return all overdue items</span>
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="cond_fines"
+                          className="rounded"
+                        />
+                        <span className="text-sm">Must pay all outstanding fines</span>
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="cond_docs"
+                          className="rounded"
+                        />
+                        <span className="text-sm">Must provide verification documents</span>
+                      </label>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Additional Notes</label>
+                      <textarea
+                        id="review_notes"
+                        className="w-full px-3 py-2 border border-gray-300 rounded h-20"
+                        placeholder="Optional notes about this request..."
+                      />
+                    </div>
+                    <div className="flex gap-2 justify-end mt-4">
+                      <Button variant="outline" onClick={() => setShowReviewModal(false)}>
+                        Close
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={() => {
+                          const reason = prompt('Reason for rejection:');
+                          if (reason) {
+                            handleRejectTypeChange(selectedTypeChangeRequest.request_id, reason);
+                            setShowReviewModal(false);
+                          }
+                        }}
+                      >
+                        Reject
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          const conditions = {
+                            condition_return_overdue_items: document.getElementById('cond_overdue').checked,
+                            condition_pay_outstanding_fines: document.getElementById('cond_fines').checked,
+                            condition_verification_documents: document.getElementById('cond_docs').checked,
+                            review_notes: document.getElementById('review_notes').value
+                          };
+                          handleSetConditions(selectedTypeChangeRequest.request_id, conditions);
+                        }}
+                      >
+                        Set Conditions & Move to Review
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {selectedTypeChangeRequest.status === 'under_review' && (
+                  <div className="border-t pt-4">
+                    <h4 className="font-semibold mb-3">Conditions Set</h4>
+                    <div className="space-y-2 mb-4 bg-gray-50 p-3 rounded">
+                      {selectedTypeChangeRequest.condition_return_overdue_items && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-green-600">✓</span>
+                          <span className="text-sm">Return all overdue items</span>
+                        </div>
+                      )}
+                      {selectedTypeChangeRequest.condition_pay_outstanding_fines && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-green-600">✓</span>
+                          <span className="text-sm">Pay all outstanding fines</span>
+                        </div>
+                      )}
+                      {selectedTypeChangeRequest.condition_verification_documents && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-green-600">✓</span>
+                          <span className="text-sm">Provide verification documents</span>
+                        </div>
+                      )}
+                      {selectedTypeChangeRequest.review_notes && (
+                        <p className="text-sm mt-2 text-gray-700">
+                          <strong>Notes:</strong> {selectedTypeChangeRequest.review_notes}
+                        </p>
+                      )}
+                    </div>
+                    <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mb-4">
+                      <p className="text-sm text-yellow-800">
+                        <strong>Conditions Met:</strong> {selectedTypeChangeRequest.conditions_met ? 'Yes ✓' : 'No - Pending verification'}
+                      </p>
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                      <Button variant="outline" onClick={() => setShowReviewModal(false)}>
+                        Close
+                      </Button>
+                      {!selectedTypeChangeRequest.conditions_met && (
+                        <Button
+                          onClick={async () => {
+                            const userData = JSON.parse(localStorage.getItem('user'));
+                            const headers = {
+                              'Content-Type': 'application/json',
+                              'x-user-type': userData.user_type,
+                              'x-user-id': userData.staff_id
+                            };
+                            const response = await fetch(
+                              `${API_BASE_URL}/member-type-requests/${selectedTypeChangeRequest.request_id}/verify-conditions`,
+                              { method: 'PUT', headers }
+                            );
+                            if (response.ok) {
+                              toast.success('Conditions verified!');
+                              await fetchTypeChangeRequests(selectedMember.member_id);
+                              setShowReviewModal(false);
+                            }
+                          }}
+                        >
+                          Verify Conditions Met
+                        </Button>
+                      )}
+                      {selectedTypeChangeRequest.conditions_met && (
+                        <Button
+                          onClick={() => {
+                            handleApproveTypeChange(selectedTypeChangeRequest.request_id);
+                            setShowReviewModal(false);
+                          }}
+                        >
+                          Approve Type Change
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1672,6 +1990,68 @@ function Members() {
           )}
         </div>
       </div>
+
+      {/* Type Change Request Modal */}
+      {showTypeChangeModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold mb-4">Request Member Type Change</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Current Type</label>
+                <input
+                  type="text"
+                  value={selectedMember?.member_type || ''}
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-100 text-gray-600"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Requested Type</label>
+                <select
+                  value={typeChangeForm.requested_type}
+                  onChange={(e) => setTypeChangeForm({...typeChangeForm, requested_type: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select type...</option>
+                  {['local', 'student', 'faculty']
+                    .filter(t => t !== selectedMember?.member_type)
+                    .map(type => (
+                      <option key={type} value={type}>{type.charAt(0).toUpperCase() + type.slice(1)}</option>
+                    ))
+                  }
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Reason for Request</label>
+                <textarea
+                  value={typeChangeForm.request_reason}
+                  onChange={(e) => setTypeChangeForm({...typeChangeForm, request_reason: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-24"
+                  placeholder="Please explain why you are requesting this type change..."
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowTypeChangeModal(false);
+                    setTypeChangeForm({ requested_type: '', request_reason: '' });
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSubmitTypeChangeRequest}
+                  disabled={!typeChangeForm.requested_type || !typeChangeForm.request_reason}
+                >
+                  Submit Request
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
