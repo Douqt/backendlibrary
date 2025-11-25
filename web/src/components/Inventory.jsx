@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
+import AddItems from './AddItems';
 
 const Inventory = ({ user }) => {
   const [activeTab, setActiveTab] = useState('books');
@@ -11,6 +12,7 @@ const Inventory = ({ user }) => {
   const [availableFilter, setAvailableFilter] = useState('all');
   const [branchFilter, setBranchFilter] = useState('all');
   const [branches, setBranches] = useState([]);
+  const [showAddForm, setShowAddForm] = useState(false);
 
   useEffect(() => {
     fetchBranches();
@@ -63,12 +65,26 @@ const Inventory = ({ user }) => {
     );
   }
 
+  if (showAddForm) {
+    return (
+      <div>
+        <div className="py-4 px-4 w-full">
+          <Button onClick={() => setShowAddForm(false)} variant="outline">Back to Inventory</Button>
+        </div>
+        <AddItems user={user} />
+      </div>
+    );
+  }
+
   return (
     <div className="py-20 px-4 w-full">
       <div className="max-w-7xl mx-auto w-full">
         <div className="mb-8">
           <h2 className="text-4xl font-bold mb-4 text-foreground">Inventory Management</h2>
           <p className="text-muted-foreground">View and manage library items</p>
+          <div className="flex gap-4 mt-4">
+            <Button onClick={() => setShowAddForm(true)}>Add New Item</Button>
+          </div>
         </div>
 
         {/* Tab Navigation */}
@@ -191,6 +207,13 @@ const Inventory = ({ user }) => {
                     >
                       View Details
                     </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDelete(itemId)}
+                    >
+                      Delete
+                    </Button>
                   </div>
                 </div>
               );
@@ -200,6 +223,30 @@ const Inventory = ({ user }) => {
       </div>
     </div>
   );
+
+  async function handleDelete(id) {
+    if (!window.confirm('Are you sure you want to delete this item?')) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/${activeTab}/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        alert('Item deleted successfully');
+        fetchItems(activeTab);
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to delete item: ${errorData.message}`);
+      }
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      alert('Error deleting item');
+    }
+  }
 };
 
 export default Inventory;
