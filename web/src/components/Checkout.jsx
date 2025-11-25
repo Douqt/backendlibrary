@@ -143,13 +143,20 @@ const Checkout = ({ user }) => {
 
   // Filter items based on type filters and search, then paginate
   useEffect(() => {
-    let filtered = allItems.filter(item =>
-      typeFilters.includes(item.type) &&
-      (localSearch === '' ||
-       item.title.toLowerCase().includes(localSearch.toLowerCase()) ||
-       item.authors.toLowerCase().includes(localSearch.toLowerCase()) ||
-       item.details.toLowerCase().includes(localSearch.toLowerCase()))
-    );
+  let search = localSearch.toLowerCase();
+
+let filtered = allItems.filter(item => {
+  if (!typeFilters.includes(item.type)) return false;
+
+  if (search === '') return true;
+
+  return (
+    (item.title ?? '').toLowerCase().includes(search) ||
+    (item.authors ?? '').toLowerCase().includes(search) ||
+    (item.details ?? '').toLowerCase().includes(search)
+  );
+});
+
 
     setTotalItems(filtered.length);
     setCurrentPage(1); // Reset to first page when filters change
