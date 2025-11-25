@@ -45,7 +45,7 @@ router.get('/', asyncHandler(async(req, res) =>{
         LEFT JOIN publishers p ON a.publisher_id = p.publisher_id
         LEFT JOIN article_authors aa ON a.artic_id = aa.artic_id
         LEFT JOIN authors au ON aa.author_id = au.author_id
-        ${whereClause ? `${whereClause} AND ` : 'WHERE '}a.deleted_at IS NULL
+        ${whereClause ? whereClause : ''}
         GROUP BY a.artic_id
         ORDER BY a.title
     `, params);

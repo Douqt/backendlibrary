@@ -42,7 +42,7 @@ router.get('/', asyncHandler(async(req, res) =>{
             CONCAT(b.name, ' - ', b.address) as branch_info
         FROM electronics e
         LEFT JOIN branches b ON e.branch_id = b.branch_id
-        ${whereClause ? `${whereClause} AND ` : 'WHERE '}e.deleted_at IS NULL
+        ${whereClause ? whereClause : ''}
         ORDER BY e.device_name
     `, params);
 
