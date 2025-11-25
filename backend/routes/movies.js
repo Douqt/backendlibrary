@@ -26,7 +26,11 @@ router.get('/', asyncHandler(async(req, res) =>{
         params.push(branch_id);
     }
 
-//query to get all movies w their directors
+    // Debug logging
+    console.log('Movies API Query:', `${whereClause} AND m.deleted_at IS NULL`);
+    console.log('Movies API Params:', params);
+
+    //query to get all movies w their directors
     const [movies] = await db.query(`
         SELECT
             m.movie_id,

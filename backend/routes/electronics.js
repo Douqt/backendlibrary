@@ -26,6 +26,10 @@ router.get('/', asyncHandler(async(req, res) =>{
         params.push(branch_id);
     }
 
+    // Debug logging
+    console.log('Electronics API Query:', `${whereClause} AND e.deleted_at IS NULL`);
+    console.log('Electronics API Params:', params);
+
     //query to get all electronics
     const [electronics] = await db.query(`
         SELECT

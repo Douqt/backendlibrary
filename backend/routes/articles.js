@@ -11,7 +11,7 @@ router.get('/', asyncHandler(async(req, res) =>{
     const params = [];
 
     if (search) {
-        whereClause = 'WHERE a.title LIKE ?';
+        whereClause += whereClause ? ' AND a.title LIKE ?' : 'WHERE a.title LIKE ?';
         params.push(`%${search}%`);
     }
 
@@ -25,6 +25,10 @@ router.get('/', asyncHandler(async(req, res) =>{
         whereClause += whereClause ? ' AND a.branch_id = ?' : ' WHERE a.branch_id = ?';
         params.push(branch_id);
     }
+
+    // Debug logging
+    console.log('Articles API Query:', `${whereClause} AND a.deleted_at IS NULL`);
+    console.log('Articles API Params:', params);
 
     //query to get all articles w their authors
     const [articles] = await db.query(`
