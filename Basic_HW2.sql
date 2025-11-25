@@ -697,16 +697,29 @@ BEGIN
     WHERE item_id = NEW.item_id AND queue_position > OLD.queue_position;
   END IF;
 
-  -- NEW: send notification when a hold becomes fulfilled
+  -- Send in-app notification when a hold becomes fulfilled
   IF NEW.status = 'fulfilled' AND OLD.status <> 'fulfilled' THEN
-    INSERT INTO notifications (member_id, message)
+    INSERT INTO notifications (
+      member_id,
+      notification_type,
+      message,
+      related_hold_request_id,
+      created_at,
+      is_read,
+      sent_via_email
+    )
     VALUES (
       NEW.member_id,
+      'hold_available',
       CONCAT(
         'Your requested item #',
         NEW.item_id,
-        ' is now available for pickup.'
-      )
+        ' is now available for pickup. Please collect it within 7 days.'
+      ),
+      NEW.request_id,
+      CURRENT_TIMESTAMP,
+      FALSE,
+      FALSE
     );
   END IF;
 END$$

@@ -405,7 +405,12 @@ router.put('/:id', asyncHandler(async (req, res) => {
   );
 
   // Handle inventory restoration and hold request fulfillment
+  // Convert item_id to composite ID format for hold requests
+  let compositeItemId;
+
   if (loan.item_type === 'book') {
+    compositeItemId = 1000000 + loan.item_id;
+
     // Always increment copies and make available if copies > 0
     // Hold requests don't prevent checkout - they just queue up
     await db.query(
@@ -416,15 +421,62 @@ router.put('/:id', asyncHandler(async (req, res) => {
     // Check if there are pending hold requests and fulfill the next one
     const [pendingHolds] = await db.query(
       'SELECT COUNT(*) as count FROM hold_requests WHERE item_id = ? AND status = "pending"',
-      [loan.item_id]
+      [compositeItemId]
     );
 
     if (pendingHolds[0].count > 0) {
-      // Fulfill the next hold request in the priority queue
-      await priorityQueueService.fulfillNextRequest(loan.item_id);
+      // Fulfill the next hold request in the priority queue using prefixed format
+      await priorityQueueService.fulfillNextRequest(`book-${loan.item_id}`);
+    }
+  } else if (loan.item_type === 'movie') {
+    compositeItemId = 2000000 + loan.item_id;
+
+    await db.query(
+      'UPDATE movies SET copy_amount = copy_amount + 1, available = CASE WHEN copy_amount + 1 > 0 THEN TRUE ELSE FALSE END WHERE movie_id = ?',
+      [loan.item_id]
+    );
+
+    const [pendingHolds] = await db.query(
+      'SELECT COUNT(*) as count FROM hold_requests WHERE item_id = ? AND status = "pending"',
+      [compositeItemId]
+    );
+
+    if (pendingHolds[0].count > 0) {
+      await priorityQueueService.fulfillNextRequest(`movie-${loan.item_id}`);
+    }
+  } else if (loan.item_type === 'article') {
+    compositeItemId = 3000000 + loan.item_id;
+
+    await db.query(
+      'UPDATE articles SET copies = copies + 1, available = CASE WHEN copies + 1 > 0 THEN TRUE ELSE FALSE END WHERE artic_id = ?',
+      [loan.item_id]
+    );
+
+    const [pendingHolds] = await db.query(
+      'SELECT COUNT(*) as count FROM hold_requests WHERE item_id = ? AND status = "pending"',
+      [compositeItemId]
+    );
+
+    if (pendingHolds[0].count > 0) {
+      await priorityQueueService.fulfillNextRequest(`article-${loan.item_id}`);
+    }
+  } else if (loan.item_type === 'electronic_rental') {
+    compositeItemId = 4000000 + loan.item_id;
+
+    await db.query(
+      'UPDATE electronics SET copy_amount = copy_amount + 1, available = CASE WHEN copy_amount + 1 > 0 THEN TRUE ELSE FALSE END WHERE libra_id = ?',
+      [loan.item_id]
+    );
+
+    const [pendingHolds] = await db.query(
+      'SELECT COUNT(*) as count FROM hold_requests WHERE item_id = ? AND status = "pending"',
+      [compositeItemId]
+    );
+
+    if (pendingHolds[0].count > 0) {
+      await priorityQueueService.fulfillNextRequest(`electronic-${loan.item_id}`);
     }
   }
-  // TODO: Add similar logic for movies, articles, and electronics when needed
 
   res.json({
     success: true,

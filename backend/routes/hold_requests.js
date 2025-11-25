@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../config/db');
 const asyncHandler = require('../middleware/asyncHandler');
 const priorityQueueService = require('../services/priorityQueueService');
+const notificationService = require('../services/notificationService');
 
 // Middleware to extract user info from headers
 const getUserFromRequest = (req) => {
@@ -198,16 +199,30 @@ router.post('/', asyncHandler(async (req, res) => {
     });
   }
 
-  // Check if item exists (try all tables)
+  // Check if item exists and has inventory based on item type
   let itemExists = false;
-  const tables = ['books', 'movies', 'articles', 'electronics'];
-  const idFields = ['book_id', 'movie_id', 'artic_id', 'libra_id'];
+  let hasInventory = false;
 
-  for (let i = 0; i < tables.length; i++) {
-    const [result] = await db.query(`SELECT 1 FROM ${tables[i]} WHERE ${idFields[i]} = ?`, [actualItemId]);
+  // Map item type to table info
+  const tableMap = {
+    'book': { table: 'books', idField: 'book_id', copyField: 'copies' },
+    'movie': { table: 'movies', idField: 'movie_id', copyField: 'copy_amount' },
+    'article': { table: 'articles', idField: 'artic_id', copyField: 'copies' },
+    'electronic': { table: 'electronics', idField: 'libra_id', copyField: 'copy_amount' }
+  };
+
+  const tableInfo = tableMap[itemType];
+  if (tableInfo) {
+    const [result] = await db.query(
+      `SELECT ${tableInfo.copyField} FROM ${tableInfo.table} WHERE ${tableInfo.idField} = ?`,
+      [actualItemId]
+    );
     if (result.length > 0) {
       itemExists = true;
-      break;
+      const totalCopies = result[0][tableInfo.copyField];
+      if (totalCopies > 0) {
+        hasInventory = true;
+      }
     }
   }
 
@@ -215,6 +230,13 @@ router.post('/', asyncHandler(async (req, res) => {
     return res.status(404).json({
       success: false,
       message: 'Item not found'
+    });
+  }
+
+  if (!hasInventory) {
+    return res.status(400).json({
+      success: false,
+      message: 'Cannot place hold: this item has no copies in inventory. Please contact library staff.'
     });
   }
 
@@ -380,10 +402,101 @@ router.put('/:id', asyncHandler(async (req, res) => {
     [status, id]
   );
 
-  // If fulfilled, update queue using service
+  // If fulfilled, send notification and update queue
   if (status === 'fulfilled') {
-    // Parse composite ID to get the prefixed ID for queue management
+    // Get item details for notification
     const compositeId = request.item_id;
+    let itemTitle, branchName, actualItemId, itemType;
+
+    if (compositeId >= 4000000) {
+      actualItemId = compositeId - 4000000;
+      itemType = 'electronic';
+      const [itemResult] = await db.query(
+        `SELECT e.device_name as title, b.name as branch_name
+         FROM electronics e
+         JOIN branches b ON e.branch_id = b.branch_id
+         WHERE e.libra_id = ?`,
+        [actualItemId]
+      );
+      if (itemResult.length > 0) {
+        itemTitle = itemResult[0].title;
+        branchName = itemResult[0].branch_name;
+      }
+    } else if (compositeId >= 3000000) {
+      actualItemId = compositeId - 3000000;
+      itemType = 'article';
+      const [itemResult] = await db.query(
+        `SELECT a.title, b.name as branch_name
+         FROM articles a
+         JOIN branches b ON a.branch_id = b.branch_id
+         WHERE a.artic_id = ?`,
+        [actualItemId]
+      );
+      if (itemResult.length > 0) {
+        itemTitle = itemResult[0].title;
+        branchName = itemResult[0].branch_name;
+      }
+    } else if (compositeId >= 2000000) {
+      actualItemId = compositeId - 2000000;
+      itemType = 'movie';
+      const [itemResult] = await db.query(
+        `SELECT m.title, b.name as branch_name
+         FROM movies m
+         JOIN branches b ON m.branch_id = b.branch_id
+         WHERE m.movie_id = ?`,
+        [actualItemId]
+      );
+      if (itemResult.length > 0) {
+        itemTitle = itemResult[0].title;
+        branchName = itemResult[0].branch_name;
+      }
+    } else if (compositeId >= 1000000) {
+      actualItemId = compositeId - 1000000;
+      itemType = 'book';
+      const [itemResult] = await db.query(
+        `SELECT bk.title, b.name as branch_name
+         FROM books bk
+         JOIN branches b ON bk.branch_id = b.branch_id
+         WHERE bk.book_id = ?`,
+        [actualItemId]
+      );
+      if (itemResult.length > 0) {
+        itemTitle = itemResult[0].title;
+        branchName = itemResult[0].branch_name;
+      }
+    } else {
+      actualItemId = compositeId;
+      itemType = 'book';
+      const [itemResult] = await db.query(
+        `SELECT bk.title, b.name as branch_name
+         FROM books bk
+         JOIN branches b ON bk.branch_id = b.branch_id
+         WHERE bk.book_id = ?`,
+        [actualItemId]
+      );
+      if (itemResult.length > 0) {
+        itemTitle = itemResult[0].title;
+        branchName = itemResult[0].branch_name;
+      }
+    }
+
+    // Send notification to member
+    try {
+      await notificationService.createHoldAvailableNotification(
+        request.member_id,
+        id,
+        {
+          itemTitle: itemTitle || `Item #${compositeId}`,
+          branchName: branchName || 'your library branch'
+        }
+      );
+      console.log(`Hold available notification sent for request ${id}`);
+    } catch (notifError) {
+      console.error('Failed to send hold notification:', notifError);
+      // Don't fail the request if notification fails
+    }
+
+    // Parse composite ID to get the prefixed ID for queue management
     let prefixedId;
     if (compositeId >= 4000000) {
       prefixedId = `electronic-${compositeId - 4000000}`;

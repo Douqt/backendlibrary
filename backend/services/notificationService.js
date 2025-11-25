@@ -10,6 +10,7 @@ const notificationMessages = {
   loan_due: (data) => `Your loan "${data.itemTitle}" is due today. Please return it to avoid late fees.`,
   loan_overdue: (data) => `OVERDUE: "${data.itemTitle}" is ${data.daysOverdue} days overdue. Current fine: $${data.currentFine}`,
   fine_paid: (data) => `Payment of $${data.amount} received. Thank you for your payment!`,
+  hold_available: (data) => `Great news! "${data.itemTitle}" is now available for pickup at ${data.branchName || 'the library'}. Please collect it within 7 days or your hold will expire.`,
   account_approved: (data) => `Welcome to the library! Your account has been approved. You can now start borrowing items.`,
   member_type_change_requested: (data) => `Your request to change membership type from ${data.currentType} to ${data.requestedType} has been submitted and is pending staff review.`,
   member_type_change_under_review: (data) => data.hasConditions
@@ -29,6 +30,7 @@ const notificationMessages = {
  * @param {number} options.relatedLoanId - Optional loan ID
  * @param {number} options.relatedFineId - Optional fine ID
  * @param {number} options.relatedTypeChangeRequestId - Optional type change request ID
+ * @param {number} options.relatedHoldRequestId - Optional hold request ID
  * @param {boolean} options.sendEmail - Whether to send email (default: true)
  * @returns {Promise<Object>} - Created notification with email status
  */
@@ -39,6 +41,7 @@ async function createNotification({
   relatedLoanId = null,
   relatedFineId = null,
   relatedTypeChangeRequestId = null,
+  relatedHoldRequestId = null,
   sendEmail: shouldSendEmail = true,
   connection = null // Allow passing existing connection to reuse transaction
 }) {
@@ -60,9 +63,9 @@ async function createNotification({
     // Insert notification into database
     const [notificationResult] = await conn.query(
       `INSERT INTO notifications
-       (member_id, notification_type, message, related_loan_id, related_fine_id, related_type_change_request_id)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [memberId, notificationType, message, relatedLoanId, relatedFineId, relatedTypeChangeRequestId]
+       (member_id, notification_type, message, related_loan_id, related_fine_id, related_type_change_request_id, related_hold_request_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [memberId, notificationType, message, relatedLoanId, relatedFineId, relatedTypeChangeRequestId, relatedHoldRequestId]
     );
 
     const notificationId = notificationResult.insertId;
@@ -283,11 +286,95 @@ async function deleteOldNotifications(daysOld = 90) {
   }
 }
 
+/**
+ * Create a hold available notification with deduplication check
+ * @param {number} memberId - Member ID to notify
+ * @param {number} holdRequestId - Hold request ID
+ * @param {Object} itemInfo - Item information
+ * @param {string} itemInfo.itemTitle - Title of the item
+ * @param {string} itemInfo.branchName - Branch name where item is available
+ * @param {Object} connection - Optional database connection for transactions
+ * @returns {Promise<Object>} - Notification result
+ */
+async function createHoldAvailableNotification(memberId, holdRequestId, itemInfo, connection = null) {
+  const conn = connection || await db.getConnection();
+  const shouldReleaseConnection = !connection;
+
+  try {
+    // Check if notification already exists for this hold request
+    const [existing] = await conn.query(
+      `SELECT notification_id FROM notifications
+       WHERE related_hold_request_id = ? AND notification_type = 'hold_available'
+       LIMIT 1`,
+      [holdRequestId]
+    );
+
+    if (existing.length > 0) {
+      console.log(`Notification already exists for hold request ${holdRequestId}`);
+
+      // Check if email was sent
+      const [notif] = await conn.query(
+        'SELECT sent_via_email FROM notifications WHERE notification_id = ?',
+        [existing[0].notification_id]
+      );
+
+      // If email wasn't sent, try to send it now
+      if (!notif[0].sent_via_email) {
+        const [members] = await conn.query(
+          'SELECT member_email, member_name FROM member WHERE member_id = ?',
+          [memberId]
+        );
+
+        if (members.length > 0 && members[0].member_email) {
+          const emailResult = await sendEmail(members[0].member_email, 'hold_available', {
+            ...itemInfo,
+            memberName: members[0].member_name
+          });
+
+          if (emailResult.success) {
+            await conn.query(
+              'UPDATE notifications SET sent_via_email = TRUE, email_sent_at = NOW() WHERE notification_id = ?',
+              [existing[0].notification_id]
+            );
+            console.log(`Email sent for existing hold notification ${existing[0].notification_id}`);
+          }
+        }
+      }
+
+      return {
+        success: true,
+        notificationId: existing[0].notification_id,
+        duplicate: true
+      };
+    }
+
+    // Create new notification
+    const result = await createNotification({
+      memberId,
+      notificationType: 'hold_available',
+      data: itemInfo,
+      relatedHoldRequestId: holdRequestId,
+      sendEmail: true,
+      connection: conn
+    });
+
+    return result;
+  } catch (error) {
+    console.error('Error creating hold available notification:', error);
+    throw error;
+  } finally {
+    if (shouldReleaseConnection) {
+      conn.release();
+    }
+  }
+}
+
 module.exports = {
   createNotification,
   markAsRead,
   getUnreadNotifications,
   getAllNotifications,
   markAllAsRead,
-  deleteOldNotifications
+  deleteOldNotifications,
+  createHoldAvailableNotification
 };

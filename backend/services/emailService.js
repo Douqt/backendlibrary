@@ -145,6 +145,40 @@ const emailTemplates = {
     text: `Payment Confirmation\n\nDear ${data.memberName},\n\nThank you! Your payment has been received and processed successfully.\n\nPayment Amount: $${data.amount}\nPayment Date: ${data.paymentDate}\nPayment Method: ${data.paymentMethod}\nFine Type: ${data.fineReason}\n\n${data.itemTitle ? `Related Item: ${data.itemTitle}\n\n` : ''}Your account has been updated. Thank you for using our library system.`
   }),
 
+  hold_available: (data) => ({
+    subject: 'Great News! Your Requested Item is Available',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #059669;">Your Hold is Ready for Pickup!</h2>
+        <p>Dear ${data.memberName},</p>
+        <p>Great news! The item you requested is now available and ready for you to pick up.</p>
+
+        <div style="background-color: #d1fae5; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #059669;">
+          <p><strong>Item:</strong> ${data.itemTitle}</p>
+          <p><strong>Pickup Location:</strong> ${data.branchName}</p>
+          <p><strong>Hold Expires:</strong> 7 days from today</p>
+        </div>
+
+        <div style="background-color: #fef3c7; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+          <p><strong>⚠️ Important:</strong> Please collect your item within <strong>7 days</strong> or your hold will expire and the item will be made available to the next person in the queue.</p>
+        </div>
+
+        <p><strong>Next Steps:</strong></p>
+        <ul style="color: #374151;">
+          <li>Visit ${data.branchName} during operating hours</li>
+          <li>Show your library card or member ID at the circulation desk</li>
+          <li>Check out your item and enjoy!</li>
+        </ul>
+
+        <p>Thank you for using our library hold service!</p>
+        <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+          This is an automated message from the Library System. Please do not reply to this email.
+        </p>
+      </div>
+    `,
+    text: `Your Hold is Ready for Pickup!\n\nDear ${data.memberName},\n\nGreat news! The item you requested is now available and ready for you to pick up.\n\nItem: ${data.itemTitle}\nPickup Location: ${data.branchName}\nHold Expires: 7 days from today\n\n⚠️ IMPORTANT: Please collect your item within 7 days or your hold will expire and the item will be made available to the next person in the queue.\n\nNext Steps:\n- Visit ${data.branchName} during operating hours\n- Show your library card or member ID at the circulation desk\n- Check out your item and enjoy!\n\nThank you for using our library hold service!`
+  }),
+
   account_approved: (data) => ({
     subject: 'Welcome! Your Library Account Has Been Approved',
     html: `
