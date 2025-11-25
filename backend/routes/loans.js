@@ -299,6 +299,29 @@ router.post('/', asyncHandler(async (req, res) => {
     [member_id]
   );
 
+  // Decrement inventory count based on item type
+  if (finalItemType === 'book') {
+    await db.query(
+      'UPDATE books SET copies = copies - 1, available = CASE WHEN copies - 1 > 0 THEN TRUE ELSE FALSE END WHERE book_id = ?',
+      [actualItemId]
+    );
+  } else if (finalItemType === 'movie') {
+    await db.query(
+      'UPDATE movies SET copy_amount = copy_amount - 1, available = CASE WHEN copy_amount - 1 > 0 THEN TRUE ELSE FALSE END WHERE movie_id = ?',
+      [actualItemId]
+    );
+  } else if (finalItemType === 'article') {
+    await db.query(
+      'UPDATE articles SET copies = copies - 1, available = CASE WHEN copies - 1 > 0 THEN TRUE ELSE FALSE END WHERE artic_id = ?',
+      [actualItemId]
+    );
+  } else if (finalItemType === 'electronic_rental') {
+    await db.query(
+      'UPDATE electronics SET copy_amount = copy_amount - 1, available = CASE WHEN copy_amount - 1 > 0 THEN TRUE ELSE FALSE END WHERE libra_id = ?',
+      [actualItemId]
+    );
+  }
+
   const loanId = result.insertId;
 
   // Get item details and branch name for notification

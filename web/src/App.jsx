@@ -893,6 +893,46 @@ function HoldRequests({ user }) {
     }
   };
 
+  const handleFulfillHold = async (requestId) => {
+    console.log('Attempting to fulfill hold:', requestId);
+    if (!confirm('Are you sure you want to fulfill this hold request?')) {
+      return;
+    }
+
+    try {
+      const userData = JSON.parse(localStorage.getItem('user'));
+      const headers = {
+        'Content-Type': 'application/json',
+        'x-user-type': userData.user_type,
+        'x-user-id': userData.user_type === 'member' ? userData.member_id : userData.staff_id
+      };
+
+      console.log('PUT request to:', `${API_BASE_URL}/hold-requests/${requestId}`);
+      console.log('Headers:', headers);
+      console.log('Body:', { status: 'fulfilled' });
+
+      const response = await fetch(`${API_BASE_URL}/hold-requests/${requestId}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ status: 'fulfilled' })
+      });
+
+      console.log('Response status:', response.status, response.ok);
+
+      if (response.ok) {
+        toast.success('Hold request fulfilled successfully!');
+        fetchRequests(); // Refresh the list
+      } else {
+        const errorData = await response.json();
+        console.error('Fulfill error response:', errorData);
+        toast.error(`Fulfill failed: ${errorData.message}`);
+      }
+    } catch (error) {
+      console.error('Fulfill error:', error);
+      toast.error('Fulfill failed due to network error');
+    }
+  };
+
   if (loading) return (
     <div className="py-20 px-4 w-full">
       <div className="max-w-7xl mx-auto w-full">
@@ -973,25 +1013,34 @@ function HoldRequests({ user }) {
                       <div className="mb-6">
                         <h4 className="text-lg font-medium mb-4 text-foreground">Active Holds</h4>
                         <div className="space-y-3">
-                          {activeHolds
-                            .sort((a, b) => a.queue_position - b.queue_position) // Sort by queue position
-                            .map(hold => (
-                            <div key={hold.request_id} className="border border-border rounded-lg p-4 bg-background hover:shadow-sm transition-shadow">
-                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                                <div className="flex-1">
-                                  <h5 className="font-medium text-foreground mb-1">{hold.item_title || 'Unknown Item'}</h5>
-                                  <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                                    <span>Queue Position: {hold.queue_position}</span>
-                                    <span>Priority Score: {hold.priority_score}</span>
-                                    <span>Requested: {new Date(hold.request_date).toLocaleDateString()}</span>
-                                  </div>
-                                </div>
-                                <Badge className="bg-yellow-100 text-yellow-800">
-                                  Pending
-                                </Badge>
+                      {activeHolds
+                        .sort((a, b) => a.queue_position - b.queue_position) // Sort by queue position
+                        .map(hold => (
+                        <div key={hold.request_id} className="border border-border rounded-lg p-4 bg-background hover:shadow-sm transition-shadow">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                            <div className="flex-1">
+                              <h5 className="font-medium text-foreground mb-1">{hold.item_title || 'Unknown Item'}</h5>
+                              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                                <span>Queue Position: {hold.queue_position}</span>
+                                <span>Priority Score: {hold.priority_score}</span>
+                                <span>Requested: {new Date(hold.request_date).toLocaleDateString()}</span>
                               </div>
                             </div>
-                          ))}
+                            <div className="flex flex-col sm:items-end gap-2">
+                              <Badge className="bg-yellow-100 text-yellow-800">
+                                Pending
+                              </Badge>
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => handleFulfillHold(hold.request_id)}
+                              >
+                                Fulfill Hold
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                         </div>
                       </div>
                     )}

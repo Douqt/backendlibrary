@@ -105,26 +105,7 @@ router.get('/', asyncHandler(async (req, res) => {
       if (branchResult.length > 0) branchId = branchResult[0].branch_id;
     }
 
-    // Auto-create loan for fulfilled holds that don't have loans
-    if (request.status === 'fulfilled') {
-      const [existingLoan] = await db.query(
-        'SELECT loan_id FROM loan WHERE member_id = ? AND item_id = ? AND item_type = ? AND return_ts IS NULL',
-        [request.member_id, actualItemId, itemType === 'electronic' ? 'electronic_rental' : itemType]
-      );
-
-      if (existingLoan.length === 0) {
-        try {
-          await db.query(
-            `INSERT INTO loan (item_id, item_type, member_id, loan_date, due_date, branch_id)
-             VALUES (?, ?, ?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 14 DAY), ?)`,
-            [actualItemId, itemType === 'electronic' ? 'electronic_rental' : itemType, request.member_id, branchId]
-          );
-          console.log(`Auto-created loan for fulfilled hold ${request.request_id}`);
-        } catch (loanError) {
-          console.error('Auto loan creation failed:', loanError);
-        }
-      }
-    }
+    // Note: Loan creation for fulfilled holds is handled when status changes to fulfilled
 
     // Query the appropriate table based on item type
     let title = 'Unknown Item';
@@ -233,10 +214,10 @@ router.post('/', asyncHandler(async (req, res) => {
     });
   }
 
-  if (!hasInventory) {
+  if (hasInventory) {
     return res.status(400).json({
       success: false,
-      message: 'Cannot place hold: this item has no copies in inventory. Please contact library staff.'
+      message: 'Cannot place hold request: this item currently has copies available for checkout.'
     });
   }
 
@@ -334,6 +315,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
 
   // If fulfilling a hold, automatically create a loan for the member
   if (status === 'fulfilled') {
+    console.log(`Fulfilling hold request ${id} for member ${request.member_id}`);
     // Parse composite ID to get actual item details
     const compositeId = request.item_id;
     let actualItemId, itemType, branchId = 1; // Default branch
@@ -385,6 +367,30 @@ router.put('/:id', asyncHandler(async (req, res) => {
         member_id: request.member_id,
         branch_id: branchId
       });
+
+      // Decrement inventory count based on item type
+      if (itemType === 'book') {
+        await db.query(
+          'UPDATE books SET copies = copies - 1, available = CASE WHEN copies - 1 > 0 THEN TRUE ELSE FALSE END WHERE book_id = ?',
+          [actualItemId]
+        );
+      } else if (itemType === 'movie') {
+        await db.query(
+          'UPDATE movies SET copy_amount = copy_amount - 1, available = CASE WHEN copy_amount - 1 > 0 THEN TRUE ELSE FALSE END WHERE movie_id = ?',
+          [actualItemId]
+        );
+      } else if (itemType === 'article') {
+        await db.query(
+          'UPDATE articles SET copies = copies - 1, available = CASE WHEN copies - 1 > 0 THEN TRUE ELSE FALSE END WHERE artic_id = ?',
+          [actualItemId]
+        );
+      } else if (itemType === 'electronic_rental') {
+        await db.query(
+          'UPDATE electronics SET copy_amount = copy_amount - 1, available = CASE WHEN copy_amount - 1 > 0 THEN TRUE ELSE FALSE END WHERE libra_id = ?',
+          [actualItemId]
+        );
+      }
+      console.log(`Inventory decremented for ${itemType} ID ${actualItemId}`);
 
     } catch (loanError) {
       console.error('Loan creation failed:', loanError);
