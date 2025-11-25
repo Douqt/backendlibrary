@@ -30,7 +30,7 @@ async function createViews() {
           m.status,
           m.join_date,
           COALESCE(loan_stats.total_loans, 0) as total_loans,
-          COALESCE(loan_stats.curr_loans, 0) as curr_loans,
+          COALESCE(loan_stats.curr_loans, 0) as curr_loans,23 mcvx23r212345
           CASE
               WHEN m.member_type = 'faculty' THEN 10
               WHEN m.member_type = 'student' THEN 5

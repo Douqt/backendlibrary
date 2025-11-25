@@ -113,7 +113,7 @@ const Header = ({ user, onSignIn, onLogout }) => {
               </NavLink>
               {(user.user_type === 'staff') && (
                 <NavLink
-                  to="/add-items"
+                  to="/inventory"
                   className={({ isActive }) =>
                     `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                       isActive
@@ -122,7 +122,7 @@ const Header = ({ user, onSignIn, onLogout }) => {
                     }`
                   }
                 >
-                  Add Items
+                  Inventory
                 </NavLink>
               )}
               {user.user_type === 'member' && (

@@ -10,13 +10,13 @@ CREATE OR REPLACE VIEW overdue_loans_report AS
 SELECT
     l.loan_id,
     m.member_id,
-    m.name AS member_name,
-    m.email AS member_email,
+    m.member_name,
+    m.member_email,
     CASE l.item_type
         WHEN 'book' THEN b.title
         WHEN 'movie' THEN mv.title
         WHEN 'article' THEN a.title
-        WHEN 'electronic_rental' THEN e.title
+        WHEN 'electronic_rental' THEN e.device_name
     END AS item_title,
     l.item_type,
     l.due_date,
@@ -29,10 +29,10 @@ JOIN member m ON l.member_id = m.member_id
 LEFT JOIN fines f ON f.loan_id = l.loan_id
 LEFT JOIN books b ON l.item_id = b.book_id AND l.item_type = 'book'
 LEFT JOIN movies mv ON l.item_id = mv.movie_id AND l.item_type = 'movie'
-LEFT JOIN articles a ON l.item_id = a.article_id AND l.item_type = 'article'
-LEFT JOIN electronics e ON l.item_id = e.electronic_id AND l.item_type = 'electronic_rental'
-WHERE l.due_date < CURRENT_DATE() AND l.return_ts IS NULL
-ORDER BY l.due_date ASC, m.name ASC;
+LEFT JOIN articles a ON l.item_id = a.artic_id AND l.item_type = 'article'
+LEFT JOIN electronics e ON l.item_id = e.libra_id AND l.item_type = 'electronic_rental'
+WHERE l.due_date < CURRENT_DATE() AND l.return_ts IS NULL AND m.deleted_at IS NULL
+ORDER BY l.due_date ASC, m.member_name ASC;
 
 -- =====================================================
 -- VIEW 2: Most Borrowed Items by Type
@@ -46,7 +46,7 @@ SELECT
         WHEN 'book' THEN b.title
         WHEN 'movie' THEN mv.title
         WHEN 'article' THEN a.title
-        WHEN 'electronic_rental' THEN e.title
+        WHEN 'electronic_rental' THEN e.device_name
     END AS item_title,
     COUNT(l.loan_id) AS times_borrowed,
     COUNT(DISTINCT l.member_id) AS unique_borrowers,
@@ -55,16 +55,16 @@ SELECT
 FROM loan l
 LEFT JOIN books b ON l.item_id = b.book_id AND l.item_type = 'book'
 LEFT JOIN movies mv ON l.item_id = mv.movie_id AND l.item_type = 'movie'
-LEFT JOIN articles a ON l.item_id = a.article_id AND l.item_type = 'article'
-LEFT JOIN electronics e ON l.item_id = e.electronic_id AND l.item_type = 'electronic_rental'
+LEFT JOIN articles a ON l.item_id = a.artic_id AND l.item_type = 'article'
+LEFT JOIN electronics e ON l.item_id = e.libra_id AND l.item_type = 'electronic_rental'
 LEFT JOIN member m ON l.member_id = m.member_id
-WHERE l.item_type IS NOT NULL
+WHERE l.item_type IS NOT NULL AND m.deleted_at IS NULL
 GROUP BY l.item_type,
          CASE l.item_type
              WHEN 'book' THEN b.title
              WHEN 'movie' THEN mv.title
              WHEN 'article' THEN a.title
-             WHEN 'electronic_rental' THEN e.title
+             WHEN 'electronic_rental' THEN e.device_name
          END
 ORDER BY l.item_type, times_borrowed DESC;
 
@@ -76,8 +76,8 @@ ORDER BY l.item_type, times_borrowed DESC;
 CREATE OR REPLACE VIEW member_activity_report AS
 SELECT
     m.member_id,
-    m.name AS member_name,
-    m.email AS member_email,
+    m.member_name,
+    m.member_email,
     m.member_type,
     m.join_date,
     COUNT(DISTINCT l.loan_id) AS total_loans,
@@ -90,7 +90,8 @@ SELECT
 FROM member m
 LEFT JOIN loan l ON m.member_id = l.member_id
 LEFT JOIN fines f ON f.member_id = m.member_id AND f.payment_status = 'unpaid'
-GROUP BY m.member_id, m.name, m.email, m.member_type, m.join_date
+WHERE m.deleted_at IS NULL
+GROUP BY m.member_id, m.member_name, m.member_email, m.member_type, m.join_date
 ORDER BY total_loans DESC, total_fines_owed DESC;
 
 -- =====================================================
@@ -105,12 +106,12 @@ SELECT
     'Fine Amount' as header9, 'Payment Status' as header10, 'Loan Date' as header11
 UNION ALL
 SELECT
-    CAST(l.loan_id AS CHAR), CAST(m.member_id AS CHAR), m.name, m.email,
+    CAST(l.loan_id AS CHAR), CAST(m.member_id AS CHAR), m.member_name, m.member_email,
     CASE l.item_type
         WHEN 'book' THEN b.title
         WHEN 'movie' THEN mv.title
         WHEN 'article' THEN a.title
-        WHEN 'electronic_rental' THEN e.title
+        WHEN 'electronic_rental' THEN e.device_name
     END,
     l.item_type, CAST(l.due_date AS CHAR), CAST(DATEDIFF(CURRENT_DATE(), l.due_date) AS CHAR),
     CAST(COALESCE(f.amount, 0) AS CHAR), COALESCE(f.payment_status, 'No Fine'), CAST(l.loan_date AS CHAR)
@@ -119,9 +120,9 @@ JOIN member m ON l.member_id = m.member_id
 LEFT JOIN fines f ON f.loan_id = l.loan_id
 LEFT JOIN books b ON l.item_id = b.book_id AND l.item_type = 'book'
 LEFT JOIN movies mv ON l.item_id = mv.movie_id AND l.item_type = 'movie'
-LEFT JOIN articles a ON l.item_id = a.article_id AND l.item_type = 'article'
-LEFT JOIN electronics e ON l.item_id = e.electronic_id AND l.item_type = 'electronic_rental'
-WHERE l.due_date < CURRENT_DATE() AND l.return_ts IS NULL;
+LEFT JOIN articles a ON l.item_id = a.artic_id AND l.item_type = 'article'
+LEFT JOIN electronics e ON l.item_id = e.libra_id AND l.item_type = 'electronic_rental'
+WHERE l.due_date < CURRENT_DATE() AND l.return_ts IS NULL AND m.deleted_at IS NULL;
 
 -- CSV-ready version of most borrowed items
 CREATE OR REPLACE VIEW most_borrowed_items_csv AS
@@ -135,7 +136,7 @@ SELECT
         WHEN 'book' THEN b.title
         WHEN 'movie' THEN mv.title
         WHEN 'article' THEN a.title
-        WHEN 'electronic_rental' THEN e.title
+        WHEN 'electronic_rental' THEN e.device_name
     END,
     CAST(COUNT(l.loan_id) AS CHAR), CAST(COUNT(DISTINCT l.member_id) AS CHAR),
     CAST(MAX(l.loan_date) AS CHAR),
@@ -143,15 +144,16 @@ SELECT
 FROM loan l
 LEFT JOIN books b ON l.item_id = b.book_id AND l.item_type = 'book'
 LEFT JOIN movies mv ON l.item_id = mv.movie_id AND l.item_type = 'movie'
-LEFT JOIN articles a ON l.item_id = a.article_id AND l.item_type = 'article'
-LEFT JOIN electronics e ON l.item_id = e.electronic_id AND l.item_type = 'electronic_rental'
-WHERE l.item_type IS NOT NULL
+LEFT JOIN articles a ON l.item_id = a.artic_id AND l.item_type = 'article'
+LEFT JOIN electronics e ON l.item_id = e.libra_id AND l.item_type = 'electronic_rental'
+LEFT JOIN member m ON l.member_id = m.member_id
+WHERE l.item_type IS NOT NULL AND m.deleted_at IS NULL
 GROUP BY l.item_type,
          CASE l.item_type
              WHEN 'book' THEN b.title
              WHEN 'movie' THEN mv.title
              WHEN 'article' THEN a.title
-             WHEN 'electronic_rental' THEN e.title
+             WHEN 'electronic_rental' THEN e.device_name
          END
 ORDER BY l.item_type, COUNT(l.loan_id) DESC;
 
@@ -164,7 +166,7 @@ SELECT
     'Days Since Last Loan' as header12
 UNION ALL
 SELECT
-    CAST(m.member_id AS CHAR), m.name, m.email, m.member_type, CAST(m.join_date AS CHAR),
+    CAST(m.member_id AS CHAR), m.member_name, m.member_email, m.member_type, CAST(m.join_date AS CHAR),
     CAST(COUNT(DISTINCT l.loan_id) AS CHAR),
     CAST(SUM(CASE WHEN l.return_ts IS NULL THEN 1 ELSE 0 END) AS CHAR),
     CAST(SUM(CASE WHEN l.return_ts IS NOT NULL THEN 1 ELSE 0 END) AS CHAR),
@@ -175,5 +177,6 @@ SELECT
 FROM member m
 LEFT JOIN loan l ON m.member_id = l.member_id
 LEFT JOIN fines f ON f.member_id = m.member_id AND f.payment_status = 'unpaid'
-GROUP BY m.member_id, m.name, m.email, m.member_type, m.join_date
+WHERE m.deleted_at IS NULL
+GROUP BY m.member_id, m.member_name, m.member_email, m.member_type, m.join_date
 ORDER BY COUNT(DISTINCT l.loan_id) DESC, COALESCE(SUM(f.amount), 0) DESC;

@@ -5,7 +5,7 @@ const asyncHandler = require('../middleware/asyncHandler');
 
 //GET /api/books - get all books
 router.get('/', asyncHandler(async(req, res) =>{
-    const { search, available } = req.query;
+    const { search, available, branch_id } = req.query;
 
     let whereClause = '';
     const params = [];
@@ -20,6 +20,15 @@ router.get('/', asyncHandler(async(req, res) =>{
     } else if (available === 'false') {
         whereClause += whereClause ? ' AND (b.available = 0 OR b.copies = 0)' : ' WHERE (b.available = 0 OR b.copies = 0)';
     }
+
+    if (branch_id) {
+        whereClause += whereClause ? ' AND b.branch_id = ?' : ' WHERE b.branch_id = ?';
+        params.push(branch_id);
+    }
+
+    // Debug logging
+    console.log('Books API Query:', `${whereClause} AND b.deleted_at IS NULL`);
+    console.log('Books API Params:', params);
 
     //query to get all books w their authors
     const [books] = await db.query(`
@@ -43,7 +52,7 @@ router.get('/', asyncHandler(async(req, res) =>{
         LEFT JOIN book_authors ba ON b.book_id = ba.book_id
         LEFT JOIN authors a ON ba.author_id = a.author_id
         LEFT JOIN branches br ON b.branch_id = br.branch_id
-        ${whereClause}
+        ${whereClause} AND b.deleted_at IS NULL
         GROUP BY b.book_id
         ORDER BY b.title
     `, params);
@@ -77,7 +86,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
         LEFT JOIN publishers p ON b.publisher_id = p.publisher_id
         LEFT JOIN book_authors ba ON b.book_id = ba.book_id
         LEFT JOIN authors a ON ba.author_id = a.author_id
-        WHERE b.book_id = ?
+        WHERE b.book_id = ? AND b.deleted_at IS NULL
         GROUP BY b.book_id
     `, [id]);
 
@@ -281,26 +290,26 @@ router.put('/:id', asyncHandler(async (req, res) => {
     });
 }));
 
-//DELETE /api/books/:id - delete a book by book_id
+//DELETE /api/books/:id - soft delete a book by book_id
 router.delete('/:id', asyncHandler(async(req, res) => {
     const {id} = req.params;
 
-    // Check if book exists
+    // Check if book exists and is not deleted
     const [existingBook] = await db.query(
-        'SELECT book_id FROM books WHERE book_id = ?',
+        'SELECT book_id FROM books WHERE book_id = ? AND deleted_at IS NULL',
         [id]
     );
 
     if(existingBook.length === 0){
         return res.status(404).json({
             success: false,
-            message: 'Book not found'
+            message: 'Book not found or already deleted'
         });
     }
 
-    // Hard delete
+    // Soft delete
     const [result] = await db.query(
-        'DELETE FROM books WHERE book_id = ?',
+        'UPDATE books SET deleted_at = NOW() WHERE book_id = ?',
         [id]
     );
 

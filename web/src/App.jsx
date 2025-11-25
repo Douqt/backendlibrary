@@ -17,7 +17,7 @@ import NotificationBell from './components/NotificationBell';
 import PaymentHistory from './components/PaymentHistory';
 import PaymentModal from './components/PaymentModal';
 import AdminSUMM_Report from './components/AdminSUMM_Report';
-import AddItems from './components/AddItems';
+import Inventory from './components/Inventory';
 import Staff from './components/Staff';
 import { Button } from './components/ui/button';
 import { Badge } from './components/ui/badge';
@@ -147,12 +147,13 @@ function App() {
                 </div>
               )
             } />
-            <Route path="/add-items" element={
-              user?.user_type === 'staff' ? <AddItems user={user} /> : (
+
+            <Route path="/inventory" element={
+              user?.user_type === 'staff' ? <Inventory user={user} /> : (
                 <div className="py-20 px-4 w-full">
                   <div className="max-w-7xl mx-auto w-full text-center">
                     <h2 className="text-4xl font-bold mb-8 text-foreground">Access Denied</h2>
-                    <p className="text-muted-foreground mb-4">You need to be logged in as staff to add items.</p>
+                    <p className="text-muted-foreground mb-4">You need to be logged in as staff to manage inventory.</p>
                     <Button onClick={openLoginModal}>Sign In</Button>
                   </div>
                 </div>

@@ -5,7 +5,7 @@ const asyncHandler = require('../middleware/asyncHandler');
 
 //GET /api/movies - get all movies with directors
 router.get('/', asyncHandler(async(req, res) =>{
-    const { search, available } = req.query;
+    const { search, available, branch_id } = req.query;
 
     let whereClause = '';
     const params = [];
@@ -21,7 +21,12 @@ router.get('/', asyncHandler(async(req, res) =>{
         whereClause += whereClause ? ' AND (m.available = 0 OR m.copy_amount = 0)' : ' WHERE (m.available = 0 OR m.copy_amount = 0)';
     }
 
-    //query to get all movies w their directors
+    if (branch_id) {
+        whereClause += whereClause ? ' AND m.branch_id = ?' : ' WHERE m.branch_id = ?';
+        params.push(branch_id);
+    }
+
+//query to get all movies w their directors
     const [movies] = await db.query(`
         SELECT
             m.movie_id,
@@ -40,7 +45,7 @@ router.get('/', asyncHandler(async(req, res) =>{
         LEFT JOIN branches b ON m.branch_id = b.branch_id
         LEFT JOIN directors d ON m.director_id = d.director_id
         LEFT JOIN publishers p ON m.publisher_id = p.publisher_id
-        ${whereClause}
+        ${whereClause} AND m.deleted_at IS NULL
         ORDER BY m.title
     `, params);
 
@@ -72,7 +77,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
         LEFT JOIN branches b ON m.branch_id = b.branch_id
         LEFT JOIN directors d ON m.director_id = d.director_id
         LEFT JOIN publishers p ON m.publisher_id = p.publisher_id
-        WHERE m.movie_id = ?
+        WHERE m.movie_id = ? AND m.deleted_at IS NULL
     `, [id]);
 
     if (movies.length === 0) {
@@ -162,6 +167,152 @@ router.post('/', asyncHandler(async(req, res) => {
             copy_amount,
             available: available !== undefined ? available : true
         }
+    });
+}));
+
+//PUT /api/movies/:id - update movie by movie_id
+router.put('/:id', asyncHandler(async (req, res) => {
+    const{id} = req.params;
+    const {
+        branch_id,
+        title,
+        isan,
+        release_date,
+        director_id,
+        publisher_id,
+        media_type,
+        location_section,
+        copy_amount,
+        available
+    } = req.body;
+
+    // Validate required fields
+    if(!branch_id || !title || !location_section || copy_amount === undefined){
+        return res.status(400).json({
+            success: false,
+            message: 'Please provide branch_id, title, location_section, and copy_amount'
+        });
+    }
+
+    // Validate media_type enum if provided
+    if(media_type && !['DVD', 'Blu-ray', 'Digital', 'VHS'].includes(media_type)){
+        return res.status(400).json({
+            success: false,
+            message: 'media_type must be one of: DVD, Blu-ray, Digital, VHS'
+        });
+    }
+
+    // Validate copy_amount is non-negative
+    if(copy_amount < 0){
+        return res.status(400).json({
+            success: false,
+            message: 'copy_amount must be greater than or equal to 0'
+        });
+    }
+
+    // Check if movie exists
+    const [existingMovie] = await db.query(
+        'SELECT movie_id FROM movies WHERE movie_id = ?',
+        [id]
+    );
+
+    if(existingMovie.length === 0){
+        return res.status(404).json({
+            success: false,
+            message: 'Movie not found or has been deleted'
+        });
+    }
+
+    // Update movie
+    const [result] = await db.query(`
+        UPDATE movies
+        SET
+            branch_id = ?,
+            title = ?,
+            isan = ?,
+            release_date = ?,
+            director_id = ?,
+            publisher_id = ?,
+            media_type = ?,
+            location_section = ?,
+            copy_amount = ?,
+            available = ?
+        WHERE movie_id = ?
+        `,
+        [
+            branch_id,
+            title,
+            isan || null,
+            release_date || null,
+            director_id || null,
+            publisher_id || null,
+            media_type || 'DVD',
+            location_section,
+            copy_amount,
+            available !== undefined ? available : true,
+            id
+        ]
+    );
+
+    if (result.affectedRows === 0){
+        return res.status(404).json({
+            success: false,
+            message: 'Movie not found'
+        });
+    }
+
+    return res.json({
+        success: true,
+        message: 'Movie updated successfully',
+        data: {
+            movie_id: id,
+            branch_id,
+            title,
+            isan,
+            release_date,
+            director_id,
+            publisher_id,
+            media_type: media_type || 'DVD',
+            location_section,
+            copy_amount,
+            available: available !== undefined ? available : true
+        }
+    });
+}));
+
+//DELETE /api/movies/:id - soft delete a movie by movie_id
+router.delete('/:id', asyncHandler(async(req, res) => {
+    const {id} = req.params;
+
+    // Check if movie exists and is not deleted
+    const [existingMovie] = await db.query(
+        'SELECT movie_id FROM movies WHERE movie_id = ? AND deleted_at IS NULL',
+        [id]
+    );
+
+    if(existingMovie.length === 0){
+        return res.status(404).json({
+            success: false,
+            message: 'Movie not found or already deleted'
+        });
+    }
+
+    // Soft delete
+    const [result] = await db.query(
+        'UPDATE movies SET deleted_at = NOW() WHERE movie_id = ?',
+        [id]
+    );
+
+    if (result.affectedRows === 0){
+        return res.status(404).json({
+            success: false,
+            message: 'Movie not found'
+        });
+    }
+
+    return res.json({
+        success: true,
+        message: 'Movie deleted successfully'
     });
 }));
 
