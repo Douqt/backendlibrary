@@ -26,10 +26,6 @@ router.get('/', asyncHandler(async(req, res) =>{
         params.push(branch_id);
     }
 
-    // Debug logging
-    console.log('Movies API Query:', `${whereClause} AND m.deleted_at IS NULL`);
-    console.log('Movies API Params:', params);
-
     //query to get all movies w their directors
     const [movies] = await db.query(`
         SELECT
@@ -49,7 +45,7 @@ router.get('/', asyncHandler(async(req, res) =>{
         LEFT JOIN branches b ON m.branch_id = b.branch_id
         LEFT JOIN directors d ON m.director_id = d.director_id
         LEFT JOIN publishers p ON m.publisher_id = p.publisher_id
-        ${whereClause} AND m.deleted_at IS NULL
+        ${whereClause ? `${whereClause} AND ` : 'WHERE '}m.deleted_at IS NULL
         ORDER BY m.title
     `, params);
 

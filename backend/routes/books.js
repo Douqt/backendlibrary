@@ -26,9 +26,7 @@ router.get('/', asyncHandler(async(req, res) =>{
         params.push(branch_id);
     }
 
-    // Debug logging
-    console.log('Books API Query:', `${whereClause} AND b.deleted_at IS NULL`);
-    console.log('Books API Params:', params);
+
 
     //query to get all books w their authors
     const [books] = await db.query(`
@@ -52,7 +50,7 @@ router.get('/', asyncHandler(async(req, res) =>{
         LEFT JOIN book_authors ba ON b.book_id = ba.book_id
         LEFT JOIN authors a ON ba.author_id = a.author_id
         LEFT JOIN branches br ON b.branch_id = br.branch_id
-        ${whereClause} AND b.deleted_at IS NULL
+        ${whereClause ? `${whereClause} AND ` : 'WHERE '}b.deleted_at IS NULL
         GROUP BY b.book_id
         ORDER BY b.title
     `, params);

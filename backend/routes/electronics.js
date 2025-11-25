@@ -26,9 +26,7 @@ router.get('/', asyncHandler(async(req, res) =>{
         params.push(branch_id);
     }
 
-    // Debug logging
-    console.log('Electronics API Query:', `${whereClause} AND e.deleted_at IS NULL`);
-    console.log('Electronics API Params:', params);
+
 
     //query to get all electronics
     const [electronics] = await db.query(`
@@ -44,7 +42,7 @@ router.get('/', asyncHandler(async(req, res) =>{
             CONCAT(b.name, ' - ', b.address) as branch_info
         FROM electronics e
         LEFT JOIN branches b ON e.branch_id = b.branch_id
-        ${whereClause} AND e.deleted_at IS NULL
+        ${whereClause ? `${whereClause} AND ` : 'WHERE '}e.deleted_at IS NULL
         ORDER BY e.device_name
     `, params);
 
